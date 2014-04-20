@@ -26,7 +26,7 @@ public class FactivaExtractor {
 			handler.getToFactivaLoginPage();
 			if(handler.atLoginPage()) {
 				System.out.println("attempting to log in");
-				handler.login("Leestep5", "SML@Proverbs31");
+				handler.login(System.getProperty("USERNAME"), System.getProperty("PASSWORD"));
 				System.out.println("logged in");
 			} else {
 				System.out.println("already logged in, it looks like");

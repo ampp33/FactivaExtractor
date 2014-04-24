@@ -1,15 +1,17 @@
 package org.malibu.msu.factiva.extractor;
 
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
+import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
+import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
+import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandler;
 
 public class FactivaExtractor {
-	public static void main(String[] args) {
+	public static void main(String[] args) throws IOException, FactivaSpreadsheetException {
 		FactivaExtractor extractor = new FactivaExtractor();
 		extractor.run();
 	}
@@ -18,10 +20,9 @@ public class FactivaExtractor {
 	// ALSO VALIDATE DATE FORMAT AND RANGES
 	// EXECUTE A TEST SEARCH FIRST TO VERIFY EVERYTHING WORKS ALRIGHT
 	
-	private List<FactivaQuery> pendingQueries = new ArrayList<>();
-	
-	public void run() {
+	public void run() throws IOException, FactivaSpreadsheetException {
 		FactivaWebHandler handler = new FactivaWebHandler("C:/Users/Ampp33/Desktop/test/", "C:/Users/Ampp33/Desktop/dest/");
+		List<FactivaQuery> pendingQueries = new FactivaQuerySpreadsheetProcessor().getQueriesFromSpreadsheet("C:/Users/Ampp33/Desktop/FactivaExtractor/queries.xlsx");
 		try {
 			handler.getToFactivaLoginPage();
 			if(handler.atLoginPage()) {
@@ -31,21 +32,19 @@ public class FactivaExtractor {
 			} else {
 				System.out.println("already logged in, it looks like");
 			}
-			System.out.println("attempting to go to search page");
-			handler.goToSearchPage();
-			System.out.println("got to search page");
-			System.out.println("executing search...");
 			
-			FactivaQuery query = new FactivaQuery();
-			//query.setCompanyName("Jackson National Life Insurance Co Inc");
-			query.setCompanyName(null);
-			query.setDateRangeFrom("2013-10-01");
-			query.setDateRangeTo("2014-01-31");
-			query.setSearchString("award");
-			query.setSources(new String[] {"Newsweek","The New York Times - All sources","The Wall Street Journal - All sources"});
-			handler.executeQuery(query);
+			for(FactivaQuery query : pendingQueries) {
+				System.out.println("attempting to go to search page");
+				handler.goToSearchPage();
+				System.out.println("got to search page");
+				System.out.println("executing query '" + query.getId() + "'...");
+				
+				// where the magic BEGINS
+				handler.executeQuery(query);
+				
+				System.out.println("query '" + query.getId() + "' completed successfully!");
+			}
 			
-			System.out.println("search completed successfully!");
 			System.out.println("attempting to log out");
 			handler.logout();
 			System.out.println("logged out");
@@ -54,9 +53,5 @@ public class FactivaExtractor {
 			System.err.println("error occurred during processing");
 			e.printStackTrace();
 		}
-	}
-	
-	private void loadQueriesFromExcelFile() {
-		
 	}
 }

@@ -2,8 +2,11 @@ package org.malibu.msu.factiva.extractor.web;
 
 import java.io.File;
 import java.io.IOException;
+import java.util.ArrayList;
+import java.util.Calendar;
+import java.util.List;
 
-import org.malibu.msu.factiva.extractor.FactivaQuery;
+import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
@@ -138,15 +141,25 @@ public class FactivaWebHandler {
 		// set company
 		try {
 			if(query.getCompanyName() != null) {
-				inputTabbedField("coTab", "coTxt", new String[] {query.getCompanyName()});
+				List<String> companyNames = new ArrayList<>();
+				companyNames.add(query.getCompanyName());
+				inputTabbedField("coTab", "coTxt", companyNames);
 			}
 		} catch (FactivaExtractorWebHandlerException e) {
 			throw new FactivaExtractorQueryException("failed to set company value", e);
 		}
 		// set search text
 		try {
+			// TODO: is comma separated correct?
+			StringBuilder subjectList = new StringBuilder();
+			String comma = "";
+			for(String subject : query.getSubjects()) {
+				subjectList.append(comma);
+				subjectList.append(subject);
+				comma = ",";
+			}
 			WebElement searchTextArea = driver.findElement(By.id("ftx"));
-			searchTextArea.sendKeys(query.getSearchString());
+			searchTextArea.sendKeys(subjectList.toString());
 		} catch (Throwable t) {
 			throw new FactivaExtractorQueryException("Failed to input search text", t);
 		}
@@ -158,22 +171,23 @@ public class FactivaWebHandler {
 			clickThis.selectByValue("Custom");
 			
 			// set to date
-			String[] fromDateElements = query.getDateRangeFrom().split("-");
+			Calendar cal = Calendar.getInstance();
+			cal.setTime(query.getDateRangeFrom());
 			WebElement fromMonthTextArea = driver.findElement(By.id("frm"));
-			fromMonthTextArea.sendKeys(fromDateElements[1]);
+			fromMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH)));
 			WebElement fromDateTextArea = driver.findElement(By.id("frd"));
-			fromDateTextArea.sendKeys(fromDateElements[2]);
+			fromDateTextArea.sendKeys(Integer.toString(cal.get(Calendar.DAY_OF_MONTH)));
 			WebElement fromYearTextArea = driver.findElement(By.id("fry"));
-			fromYearTextArea.sendKeys(fromDateElements[0]);
+			fromYearTextArea.sendKeys(Integer.toString(cal.get(Calendar.YEAR)));
 			
 			// set from date
-			String[] toDateElements = query.getDateRangeTo().split("-");
+			cal.setTime(query.getDateRangeTo());
 			WebElement toMonthTextArea = driver.findElement(By.id("tom"));
-			toMonthTextArea.sendKeys(toDateElements[1]);
+			toMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH)));
 			WebElement toDateTextArea = driver.findElement(By.id("tod"));
-			toDateTextArea.sendKeys(toDateElements[2]);
+			toDateTextArea.sendKeys(Integer.toString(cal.get(Calendar.DAY_OF_MONTH)));
 			WebElement toYearTextArea = driver.findElement(By.id("toy"));
-			toYearTextArea.sendKeys(toDateElements[0]);
+			toYearTextArea.sendKeys(Integer.toString(cal.get(Calendar.YEAR)));
 		} catch (Throwable t) {
 			throw new FactivaExtractorQueryException("Failed to set start and end date", t);
 		}
@@ -238,7 +252,7 @@ public class FactivaWebHandler {
 		}
 	}
 	
-	private void inputTabbedField(String tabElementId, String inputElementId, String[] values) throws FactivaExtractorWebHandlerException {
+	private void inputTabbedField(String tabElementId, String inputElementId, List<String> values) throws FactivaExtractorWebHandlerException {
 		// open tab
 		WebElement tabElement = driver.findElement(By.id(tabElementId));
 		tabElement.click();

@@ -14,15 +14,12 @@ public class FactivaExtractor {
 	public static void main(String[] args) throws IOException, FactivaSpreadsheetException {
 		FactivaExtractor extractor = new FactivaExtractor();
 		extractor.run();
+//		extractor.runTests();
 	}
 	
-	// NEED TO DO VALIDATION ON QUERY, REQUIRED FIELDS MUST BE VALID AND NOT NULL!
-	// ALSO VALIDATE DATE FORMAT AND RANGES
-	// EXECUTE A TEST SEARCH FIRST TO VERIFY EVERYTHING WORKS ALRIGHT
-	
 	public void run() throws IOException, FactivaSpreadsheetException {
+		List<FactivaQuery> pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/queries.xlsx").getQueriesFromSpreadsheet(true);
 		FactivaWebHandler handler = new FactivaWebHandler("C:/Users/Ampp33/Desktop/test/", "C:/Users/Ampp33/Desktop/dest/");
-		List<FactivaQuery> pendingQueries = new FactivaQuerySpreadsheetProcessor().getQueriesFromSpreadsheet("C:/Users/Ampp33/Desktop/FactivaExtractor/queries.xlsx");
 		try {
 			handler.getToFactivaLoginPage();
 			if(handler.atLoginPage()) {
@@ -52,6 +49,39 @@ public class FactivaExtractor {
 		} catch (FactivaExtractorQueryException | FactivaExtractorWebHandlerException | IOException e) {
 			System.err.println("error occurred during processing");
 			e.printStackTrace();
+		}
+	}
+	
+	public void runTests() throws IOException, FactivaSpreadsheetException {
+		System.out.println("running valid tests");
+		List<FactivaQuery> pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/valid_queries.xlsx").getQueriesFromSpreadsheet(true);
+		System.out.println("running valid tests (.xls ext)");
+		pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/valid_queries.xls").getQueriesFromSpreadsheet(true);
+		System.out.println("successfully loaded queries");
+		for(int i = 1; i <= 18; i++) {
+			try {
+				System.out.println("running bad query " + i);
+				pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/bad_query_" + i + ".xlsx").getQueriesFromSpreadsheet(true);
+				System.out.println("didn't run into any errors!  BAD");
+			} catch (FactivaSpreadsheetException ex) {
+				System.out.println("caught exception: " + ex.getMessage());
+			}
+		}
+		
+		try {
+			System.out.println("testing missing file");
+			pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/doesnt_exist.xlsx").getQueriesFromSpreadsheet(true);
+			System.out.println("didn't run into any errors!  BAD");
+		} catch (FactivaSpreadsheetException | IOException ex) {
+			System.out.println("caught exception: " + ex.getMessage());
+		}
+		
+		try {
+			System.out.println("testing bad file extension");
+			pendingQueries = new FactivaQuerySpreadsheetProcessor("C:/Users/Ampp33/Desktop/FactivaExtractor/stuff.txt").getQueriesFromSpreadsheet(true);
+			System.out.println("didn't run into any errors!  BAD");
+		} catch (FactivaSpreadsheetException | IOException ex) {
+			System.out.println("caught exception: " + ex.getMessage());
 		}
 	}
 }

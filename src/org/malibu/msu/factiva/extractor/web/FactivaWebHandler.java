@@ -37,6 +37,7 @@ public class FactivaWebHandler {
 		File firefoxProfileFolder = new File("C:\\Users\\Ampp33\\Desktop\\FactivaExtractor\\FirefoxProfile");
 		FirefoxProfile profile = new FirefoxProfile(firefoxProfileFolder);
 		updateFirefoxFileDownloadProperties(profile, tempDownloadsDirectory);
+//		this.driver = new HtmlUnitDriver(true);
 		this.driver = new FirefoxDriver(profile);
 //		this.driver = new ChromeDriver();
 	}

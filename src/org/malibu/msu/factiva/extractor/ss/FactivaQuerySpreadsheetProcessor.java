@@ -29,20 +29,38 @@ public class FactivaQuerySpreadsheetProcessor {
 	private static final int START_DATE_COLUMN_INDEX = 4;
 	private static final int END_DATE_COLUMN_INDEX = 5;
 	
+	private Workbook workbook = null;
+	
+	/**
+	 * Constructor that accepts a file path, and verifies the spreadsheet before
+	 * successfully creation the object, throwing an exception if any errors
+	 * or issues are found
+	 * 
+	 * @param filePath
+	 * @throws IOException
+	 * @throws FactivaSpreadsheetException
+	 */
+	public FactivaQuerySpreadsheetProcessor(String filePath) throws IOException, FactivaSpreadsheetException {
+		this.workbook = validateAndLoadWorkbook(filePath);
+		this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
+		validateWorkbook(workbook);
+	}
+	
 	/**
 	 * Validate and load queries from main sheet, throwing an error if any problems
 	 * are encountered along the way
 	 * 
-	 * @param filePath
 	 * @return
 	 * @throws IOException
 	 * @throws FactivaSpreadsheetException
 	 */
-	public List<FactivaQuery> getQueriesFromSpreadsheet(String filePath) throws IOException, FactivaSpreadsheetException {
-		Workbook workbook = validateAndLoadWorkbook(filePath);
-		this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
-		validateWorkbook(workbook);
-		return validateAndGetFactivaQueries(workbook);
+	public List<FactivaQuery> getQueriesFromSpreadsheet(boolean validate) throws IOException, FactivaSpreadsheetException {
+		List<FactivaQuery> result = validateAndGetFactivaQueries(workbook);
+		// validate all queries
+		for(FactivaQuery query : result) {
+			validateQuery(query, validate);
+		}
+		return result;
 	}
 	
 	/**
@@ -60,7 +78,7 @@ public class FactivaQuerySpreadsheetProcessor {
 		FactivaQuery currentQuery = null;
 		Row currentRow = null;
 		String currentId = null;
-		for(int rowIndex = 1; rowIndex < sheet.getLastRowNum(); rowIndex++) {
+		for(int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
 			currentRow = sheet.getRow(rowIndex);
 			if(currentRow == null) continue;
 			// check if we found a new ID
@@ -73,6 +91,9 @@ public class FactivaQuerySpreadsheetProcessor {
 				queries.add(currentQuery);
 				currentQuery.setId(id);
 				currentQuery.setQueryRowNumber(rowIndex + 1);
+			}
+			if(currentQuery == null) {
+				throw new FactivaSpreadsheetException("query at spreadsheet row " + rowIndex + " doesn't have an ID, which is required");
 			}
 			String source = WorkbookUtil.getCellValueAsString(evaluator, currentRow.getCell(SOURCE_COLUMN_INDEX));
 			if(source != null && source.trim().length() != 0) {
@@ -96,12 +117,11 @@ public class FactivaQuerySpreadsheetProcessor {
 			}
 		}
 		
-		// validate all queries
-		for(FactivaQuery query : queries) {
-			validateQuery(query);
-		}
-		
 		return queries;
+	}
+	
+	public List<String> validateQuery(FactivaQuery query) throws FactivaSpreadsheetException {
+		return validateQuery(query, true);
 	}
 	
 	/**
@@ -110,27 +130,44 @@ public class FactivaQuerySpreadsheetProcessor {
 	 * @param query
 	 * @throws FactivaSpreadsheetException
 	 */
-	private void validateQuery(FactivaQuery query) throws FactivaSpreadsheetException {
+	public List<String> validateQuery(FactivaQuery query, boolean throwExceptions) throws FactivaSpreadsheetException {
+		List<String> errorMessages = new ArrayList<>();
 		if(query == null) {
-			throw new FactivaSpreadsheetException("null query detected");
+			addOrThrowError("null query detected", errorMessages, throwExceptions);
+			return errorMessages;
 		}
 		if(query.getId() == null) {
-			throw new FactivaSpreadsheetException("query at row " + query.getQueryRowNumber() + " has no ID");
+			addOrThrowError("query at row " + query.getQueryRowNumber() + " has no ID", errorMessages, throwExceptions);
 		}
+		String errorMessagePrefix = "query '" + query.getId() + "' at row " + query.getQueryRowNumber();
 		if(query.getSources() == null || query.getSources().size() == 0) {
-			throw new FactivaSpreadsheetException("query '" + query.getId() + "' at row " + query.getQueryRowNumber() + " has no sources");
+			addOrThrowError(errorMessagePrefix + " has no sources", errorMessages, throwExceptions);
 		}
 		if(query.getCompanyName() == null || query.getCompanyName().trim().length() == 0) {
-			throw new FactivaSpreadsheetException("query '" + query.getId() + "' at row " + query.getQueryRowNumber() + " has no company name");
+			addOrThrowError(errorMessagePrefix + " has no company name", errorMessages, throwExceptions);
 		}
 		if(query.getSubjects() == null || query.getSubjects().size() == 0) {
-			throw new FactivaSpreadsheetException("query '" + query.getId() + "' at row " + query.getQueryRowNumber() + " has no subjects");
+			addOrThrowError(errorMessagePrefix + " has no subjects", errorMessages, throwExceptions);
 		}
 		if(query.getDateRangeFrom() == null) {
-			throw new FactivaSpreadsheetException("query '" + query.getId() + "' at row " + query.getQueryRowNumber() + " has no start date");
+			addOrThrowError(errorMessagePrefix + " has no start date, or has an invalid value", errorMessages, throwExceptions);
 		}
 		if(query.getDateRangeTo() == null) {
-			throw new FactivaSpreadsheetException("query '" + query.getId() + "' at row " + query.getQueryRowNumber() + " has no end date");
+			addOrThrowError(errorMessagePrefix + " has no end date, or has an invalid value", errorMessages, throwExceptions);
+		}
+		if(query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime()) {
+			addOrThrowError(errorMessagePrefix + " has a start date later than the end date", errorMessages, throwExceptions);
+		}
+		return errorMessages;
+	}
+	
+	private void addOrThrowError(String errorText, List<String> errorMessages, boolean throwException) throws FactivaSpreadsheetException {
+		if(throwException) {
+			throw new FactivaSpreadsheetException(errorText);
+		} else {
+			if(errorText != null && errorMessages != null) {
+				errorMessages.add(errorText);
+			}
 		}
 	}
 
@@ -178,7 +215,12 @@ public class FactivaQuerySpreadsheetProcessor {
 		}
 		File spreadsheetFile = new File(filePath);
 		if(!spreadsheetFile.exists() || !spreadsheetFile.isFile()) {
-			throw new IOException("spreadsheet file doesn't exist, or isn't a file, please verify");
+			throw new IOException("spreadsheet file '" + filePath + "' doesn't exist, or isn't a file, please verify");
+		}
+		
+		// verify file extension
+		if(!(filePath.toLowerCase().endsWith(".xlsx") || filePath.toLowerCase().endsWith(".xls"))) {
+			throw new IOException("spreadsheet file doesn't have a valid Excel extension (ex: .xls or .xlsx)");
 		}
 		
 		// load workbook

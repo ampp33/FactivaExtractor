@@ -27,4 +27,22 @@ public class FilesystemUtil {
 		destStream.close();
 		srcStream.close();
 	}
+	
+	public static boolean isValidFileName(String potentialFileName) {
+		if(potentialFileName == null || potentialFileName.trim().length() == 0) return false;
+		for(int i = 0; i < potentialFileName.length(); i++) {
+			if(potentialFileName.charAt(i) == '\\'
+					|| potentialFileName.charAt(i) == '/'
+					|| potentialFileName.charAt(i) == ':'
+					|| potentialFileName.charAt(i) == '*'
+					|| potentialFileName.charAt(i) == '?'
+					|| potentialFileName.charAt(i) == '"'
+					|| potentialFileName.charAt(i) == '<'
+					|| potentialFileName.charAt(i) == '>'
+					|| potentialFileName.charAt(i) == '|') {
+				return false;
+			}
+		}
+		return true;
+	}
 }

@@ -16,6 +16,7 @@ import org.apache.poi.ss.usermodel.Workbook;
 import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
+import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 
 public class FactivaQuerySpreadsheetProcessor {
 	
@@ -51,16 +52,14 @@ public class FactivaQuerySpreadsheetProcessor {
 	 * Validate and load queries from main sheet, throwing an error if any problems
 	 * are encountered along the way
 	 * 
+	 * @param throwExceptionIfErrors
 	 * @return
 	 * @throws IOException
 	 * @throws FactivaSpreadsheetException
 	 */
-	public List<FactivaQuery> getQueriesFromSpreadsheet(boolean validate) throws IOException, FactivaSpreadsheetException {
-		List<FactivaQuery> result = validateAndGetFactivaQueries(workbook);
-		// validate all queries
-		for(FactivaQuery query : result) {
-			validateQuery(query, validate);
-		}
+	public List<FactivaQuery> getQueriesFromSpreadsheet(boolean throwExceptionIfErrors) throws IOException, FactivaSpreadsheetException {
+		List<FactivaQuery> result = getFactivaQueries(workbook);
+		validateQueries(result, throwExceptionIfErrors);
 		return result;
 	}
 	
@@ -71,7 +70,7 @@ public class FactivaQuerySpreadsheetProcessor {
 	 * @return
 	 * @throws FactivaSpreadsheetException 
 	 */
-	private List<FactivaQuery> validateAndGetFactivaQueries(Workbook workbook) throws FactivaSpreadsheetException {
+	private List<FactivaQuery> getFactivaQueries(Workbook workbook) throws FactivaSpreadsheetException {
 		Sheet sheet = workbook.getSheet(SHEET_NAME);
 		List<FactivaQuery> queries = new ArrayList<>();
 		
@@ -121,44 +120,61 @@ public class FactivaQuerySpreadsheetProcessor {
 		return queries;
 	}
 	
-	public List<String> validateQuery(FactivaQuery query) throws FactivaSpreadsheetException {
-		return validateQuery(query, true);
-	}
-	
 	/**
 	 * Validate that the query object has all required fields, and if not, throw an exception
 	 * 
-	 * @param query
+	 * @param queries
+	 * @param throwExceptions
 	 * @throws FactivaSpreadsheetException
 	 */
-	public List<String> validateQuery(FactivaQuery query, boolean throwExceptions) throws FactivaSpreadsheetException {
+	public List<String> validateQueries(List<FactivaQuery> queries, boolean throwExceptions) throws FactivaSpreadsheetException {
 		List<String> errorMessages = new ArrayList<>();
-		if(query == null) {
-			addOrThrowError("null query detected", errorMessages, throwExceptions);
-			return errorMessages;
-		}
-		if(query.getId() == null) {
-			addOrThrowError("query at row " + query.getQueryRowNumber() + " has no ID", errorMessages, throwExceptions);
-		}
-		String errorMessagePrefix = "query '" + query.getId() + "' at row " + query.getQueryRowNumber();
-		if(query.getSources() == null || query.getSources().size() == 0) {
-			addOrThrowError(errorMessagePrefix + " has no sources", errorMessages, throwExceptions);
-		}
-		if(query.getCompanyName() == null || query.getCompanyName().trim().length() == 0) {
-			addOrThrowError(errorMessagePrefix + " has no company name", errorMessages, throwExceptions);
-		}
-		if(query.getSubjects() == null || query.getSubjects().size() == 0) {
-			addOrThrowError(errorMessagePrefix + " has no subjects", errorMessages, throwExceptions);
-		}
-		if(query.getDateRangeFrom() == null) {
-			addOrThrowError(errorMessagePrefix + " has no start date, or has an invalid value", errorMessages, throwExceptions);
-		}
-		if(query.getDateRangeTo() == null) {
-			addOrThrowError(errorMessagePrefix + " has no end date, or has an invalid value", errorMessages, throwExceptions);
-		}
-		if(query.getDateRangeFrom() != null && query.getDateRangeTo() != null 
-				&& (query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime())) {
-			addOrThrowError(errorMessagePrefix + " has a start date later than the end date", errorMessages, throwExceptions);
+		if(queries != null) {
+			List<String> knownIds = new ArrayList<>();
+			for (FactivaQuery query : queries) {
+				if(query == null) {
+					addOrThrowError("null query detected", errorMessages, throwExceptions);
+					return errorMessages;
+				}
+				if(query.getId() == null) {
+					addOrThrowError("query at row " + query.getQueryRowNumber() + " has no ID", errorMessages, throwExceptions);
+				}
+				// verify there aren't duplicate IDs
+				boolean idAlreadyUsed = false;
+				for(String id : knownIds) {
+					if(query.getId().equals(id)) {
+						addOrThrowError("query at row " + query.getQueryRowNumber()
+								+ " has has an ID ('" + id + "') that has already been used, duplicate IDs are not allowed", errorMessages, throwExceptions);
+						idAlreadyUsed = true;
+					}
+				}
+				if(!idAlreadyUsed) {
+					knownIds.add(query.getId());
+				}
+				if(!FilesystemUtil.isValidFileName(query.getId())) {
+					addOrThrowError("query at row " + query.getQueryRowNumber() + " has an ID that won't translate to an acceptable filename", errorMessages, throwExceptions);
+				}
+				String errorMessagePrefix = "query '" + query.getId() + "' at row " + query.getQueryRowNumber();
+				if(query.getSources() == null || query.getSources().size() == 0) {
+					addOrThrowError(errorMessagePrefix + " has no sources", errorMessages, throwExceptions);
+				}
+				if(query.getCompanyName() == null || query.getCompanyName().trim().length() == 0) {
+					addOrThrowError(errorMessagePrefix + " has no company name", errorMessages, throwExceptions);
+				}
+				if(query.getSubjects() == null || query.getSubjects().size() == 0) {
+					addOrThrowError(errorMessagePrefix + " has no subjects", errorMessages, throwExceptions);
+				}
+				if(query.getDateRangeFrom() == null) {
+					addOrThrowError(errorMessagePrefix + " has no start date, or has an invalid value", errorMessages, throwExceptions);
+				}
+				if(query.getDateRangeTo() == null) {
+					addOrThrowError(errorMessagePrefix + " has no end date, or has an invalid value", errorMessages, throwExceptions);
+				}
+				if(query.getDateRangeFrom() != null && query.getDateRangeTo() != null 
+						&& (query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime())) {
+					addOrThrowError(errorMessagePrefix + " has a start date later than the end date", errorMessages, throwExceptions);
+				}
+			}
 		}
 		return errorMessages;
 	}

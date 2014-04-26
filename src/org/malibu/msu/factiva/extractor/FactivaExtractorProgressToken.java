@@ -2,19 +2,20 @@ package org.malibu.msu.factiva.extractor;
 
 public class FactivaExtractorProgressToken {
 	private FactivaExtractorProgressListener listener = null;
-	private String currentId = null;
+	private String statusMessage = null;
 	private int percentComplete = 0;
+	private boolean errorOccurred = false;
 	
 	public void setListener(FactivaExtractorProgressListener listener) {
 		this.listener = listener;
 	}
-	public String getCurrentId() {
-		return currentId;
+	public String getStatusMessage() {
+		return statusMessage;
 	}
-	public void setCurrentId(String currentId) {
-		this.currentId = currentId;
+	public void setStatusMessage(String statusMessage) {
+		this.statusMessage = statusMessage;
 		if(listener != null) {
-			listener.progressChanged(this);
+			listener.stateChanged(this);
 		}
 	}
 	public int getPercentComplete() {
@@ -23,7 +24,16 @@ public class FactivaExtractorProgressToken {
 	public void setPercentComplete(int percentComplete) {
 		this.percentComplete = percentComplete;
 		if(listener != null) {
-			listener.progressChanged(this);
+			listener.stateChanged(this);
+		}
+	}
+	public boolean isErrorOccurred() {
+		return errorOccurred;
+	}
+	public void setErrorOccurred(boolean errorOccurred) {
+		this.errorOccurred = errorOccurred;
+		if(listener != null) {
+			listener.stateChanged(this);
 		}
 	}
 }

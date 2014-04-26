@@ -9,6 +9,7 @@ import java.util.List;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
+import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -226,7 +227,14 @@ public class FactivaWebHandler {
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
 			throw new FactivaExtractorQueryException("unexpected contents in temp download directory");
 		}
-		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), this.downloadDestinationDirectory + "final.rtf");
+		// create download destination directory
+		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + "/";
+		File downloadDestDir = new File(downloadDestDirPath);
+		if(!downloadDestDir.mkdir()) {
+			throw new FactivaExtractorQueryException("failed to create destination directory for downloaded file: " + downloadDestDirPath);
+		}
+		// copy downloaded file to download destination directory
+		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), downloadDestDirPath + Constants.getInstance().getConstant(Constants.DOWNLOADED_FILE_NAME));
 		
 		return numberOfArticlesDownloaded;
 	}

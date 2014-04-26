@@ -8,8 +8,8 @@ import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.image.BufferedImage;
 import java.io.File;
+import java.io.FilenameFilter;
 import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -33,12 +33,17 @@ import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
+import org.malibu.msu.factiva.extractor.util.Constants;
 
 public class FactivaExtractorUi {
 
 	private JFrame frmFactivaextractorV;
+	private JLabel lblDirectory;
+	private JTextField textFieldUsername;
+	private JTextField textFieldPassword;
 	
 	private boolean spreadsheetVerified = false;
+	
 	
 	/**
 	 * Launch the application.
@@ -77,14 +82,14 @@ public class FactivaExtractorUi {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
 		frmFactivaextractorV.setTitle("FactivaExtractor v1.0");
-		frmFactivaextractorV.setBounds(100, 100, 650, 515);
+		frmFactivaextractorV.setBounds(100, 100, 650, 500);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
 		
 		final JFrame mainFrame = frmFactivaextractorV;
 		
 		JPanel panel = new JPanel();
-		panel.setBounds(0, 0, 644, 482);
+		panel.setBounds(0, 0, 644, 469);
 		panel.setBackground(Color.WHITE);
 		frmFactivaextractorV.getContentPane().add(panel);
 		panel.setLayout(null);
@@ -99,7 +104,7 @@ public class FactivaExtractorUi {
 		lblUsername.setBounds(260, 121, 63, 16);
 		panel.add(lblUsername);
 
-		final JTextField textFieldUsername = new JTextField();
+		textFieldUsername = new JTextField(System.getProperty("USERNAME"));
 		textFieldUsername.setBounds(328, 118, 116, 22);
 		panel.add(textFieldUsername);
 		textFieldUsername.setColumns(10);
@@ -108,7 +113,7 @@ public class FactivaExtractorUi {
 		lblPassword.setBounds(449, 121, 60, 16);
 		panel.add(lblPassword);
 
-		final JTextField textFieldPassword = new JPasswordField();
+		textFieldPassword = new JPasswordField(System.getProperty("PASSWORD"));
 		textFieldPassword.setBounds(514, 118, 116, 22);
 		panel.add(textFieldPassword);
 		textFieldPassword.setColumns(10);
@@ -125,7 +130,7 @@ public class FactivaExtractorUi {
 		lblStepSelect.setBounds(10, 150, 620, 16);
 		panel.add(lblStepSelect);
 		
-		final JLabel lblDirectory = new JLabel("<please select a directory>");
+		lblDirectory = new JLabel("<please select a directory>");
 		lblDirectory.setBounds(193, 175, 437, 16);
 		panel.add(lblDirectory);
 
@@ -161,40 +166,21 @@ public class FactivaExtractorUi {
 		btnValidate.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent e) {
-				String workingDirectory = lblDirectory.getText();
-				if(workingDirectory == null || workingDirectory.trim().length() == 0) {
-					MessageHandler.showErrorMessage("no working directory chosen");
+				if(!verifyWorkingDirectory()) {
 					return;
 				}
-				File workingDirectoryFile = new File(workingDirectory);
-				if(!workingDirectoryFile.exists() || !workingDirectoryFile.isDirectory()) {
-					MessageHandler.showErrorMessage("working directory invalid, or not a directory");
-					return;
-				}
-				File[] filesInWorkingDir = workingDirectoryFile.listFiles();
-				String excelFilePath = null;
-				int numExcelFilesFound = 0;
-				for (File file : filesInWorkingDir) {
-					if(file.getName().toLowerCase().endsWith(".xls") || file.getName().toLowerCase().endsWith(".xlsx")) {
-						excelFilePath = file.getAbsolutePath();
-						numExcelFilesFound++;
+				File workingDirectoryFile = new File(lblDirectory.getText());
+				File[] filesInWorkingDir = workingDirectoryFile.listFiles(new FilenameFilter() {
+					@Override
+					public boolean accept(File file, String fileName) {
+						return fileName != null && (fileName.toLowerCase().endsWith(".xls") || fileName.toLowerCase().endsWith(".xlsx"));
 					}
-				}
-				if(numExcelFilesFound == 0) {
-					MessageHandler.showErrorMessage("no Excel file found in working directory");
-					return;
-				}
-				if(numExcelFilesFound > 1) {
-					MessageHandler.showErrorMessage("more than one Excel file found in working directory!");
-					return;
-				}
+				});
+				String excelFilePath = filesInWorkingDir[0].getAbsolutePath();
 				try {
 					FactivaQuerySpreadsheetProcessor processor = new FactivaQuerySpreadsheetProcessor(excelFilePath);
 					List<FactivaQuery> queries = processor.getQueriesFromSpreadsheet(false);
-					List<String> errorMessages = new ArrayList<>();
-					for (FactivaQuery factivaQuery : queries) {
-						errorMessages.addAll(processor.validateQuery(factivaQuery, false));
-					}
+					List<String> errorMessages = processor.validateQueries(queries, false);
 					if(errorMessages.size() > 0) {
 						MessageHandler.showMultipleErrorMessages("errors detected in Excel file:", errorMessages);
 						return;
@@ -218,33 +204,54 @@ public class FactivaExtractorUi {
 		panel.add(lblStepRun);
 		
 		final JProgressBar progressBar = new JProgressBar();
-		final JLabel lblCurrentItem = new JLabel("<item id>");
+		final JLabel lblStatusMessage = new JLabel("Not started");
 		
 		JButton btnRun = new JButton("Run");
 		btnRun.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				if(textFieldUsername.getText() == null || textFieldUsername.getText().trim().length() == 0) {
-					MessageHandler.showErrorMessage("No username specified");
+				if(!verifyAllFields()) {
 					return;
 				}
-				if(textFieldPassword.getText() == null || textFieldPassword.getText().trim().length() == 0) {
-					MessageHandler.showErrorMessage("No password specified");
-					return;
+				
+				// get username and password
+				String username = textFieldUsername.getText();
+				String password = textFieldPassword.getText();
+				
+				// get spreadsheet file path
+				File workingDir = new File(lblDirectory.getText());
+				File[] filesInWorkingDir = workingDir.listFiles(new FilenameFilter() {
+					@Override
+					public boolean accept(File file, String fileName) {
+						return fileName != null && (fileName.toLowerCase().endsWith(".xls") || fileName.toLowerCase().endsWith(".xlsx"));
+					}
+				});
+				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
+				
+				// create output directory if it doesn't exist already
+				String outputDirectoryPath = lblDirectory.getText() + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "/";
+				File outputDir = new File(outputDirectoryPath);
+				if(!(outputDir.exists() && outputDir.isDirectory())) {
+					outputDir.mkdir();
 				}
-				if(!spreadsheetVerified) {
-					MessageHandler.showErrorMessage("Spreadsheet not yet been successfully verified, please verify first");
-					return;
+				
+				// create temp download directory if it doesn't exist already
+				String tempDownloadDirPath = lblDirectory.getText() + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "/";
+				File tempDownloadDir = new File(tempDownloadDirPath);
+				if(!(tempDownloadDir.exists() && tempDownloadDir.isDirectory())) {
+					tempDownloadDir.mkdir();
 				}
+				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
 				progressToken.setListener(new FactivaExtractorProgressListener() {
 					@Override
-					public void progressChanged(FactivaExtractorProgressToken token) {
+					public void stateChanged(FactivaExtractorProgressToken token) {
 						progressBar.setValue(token.getPercentComplete());
-						lblCurrentItem.setText(token.getCurrentId());
+						lblStatusMessage.setText(token.getStatusMessage());
+						MessageHandler.logMessage("(" + token.getPercentComplete() + "%) - " + token.getStatusMessage());
 					}
 				});
-				new Thread(new FactivaExtractorThread(null, progressToken)).start();
+				new Thread(new FactivaExtractorThread(username, password, spreadsheetFilePath, tempDownloadDirPath, outputDirectoryPath, progressToken)).start();
 			}
 		});
 		btnRun.setBounds(10, 272, 97, 25);
@@ -263,25 +270,16 @@ public class FactivaExtractorUi {
 		lblStatus.setBounds(10, 306, 68, 16);
 		panel.add(lblStatus);
 
-		JLabel lblNotStarted = new JLabel("Not started");
-		lblNotStarted.setBounds(81, 306, 549, 16);
-		panel.add(lblNotStarted);
-
-		JLabel lblLog = new JLabel("Current Item:");
-		lblLog.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblLog.setBounds(10, 345, 97, 16);
-		panel.add(lblLog);
-
-		lblCurrentItem.setBounds(108, 345, 522, 16);
-		panel.add(lblCurrentItem);
+		lblStatusMessage.setBounds(81, 306, 549, 16);
+		panel.add(lblStatusMessage);
 
 		JLabel lblLog_1 = new JLabel("Log:");
 		lblLog_1.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblLog_1.setBounds(10, 366, 97, 16);
+		lblLog_1.setBounds(10, 350, 33, 16);
 		panel.add(lblLog_1);
 		
 		JPanel panel_1 = new JPanel();
-		panel_1.setBounds(43, 366, 587, 103);
+		panel_1.setBounds(45, 351, 587, 103);
 		panel.add(panel_1);
 		panel_1.setLayout(new BorderLayout(0, 0));
 				
@@ -294,5 +292,52 @@ public class FactivaExtractorUi {
 		panel_1.add(scroll, BorderLayout.CENTER);
 		
 		MessageHandler.setLogTextArea(logTextArea);
+	}
+	
+	private boolean verifyWorkingDirectory() {
+		String workingDirectory = lblDirectory.getText();
+		if(workingDirectory == null || workingDirectory.trim().length() == 0) {
+			MessageHandler.showErrorMessage("no working directory chosen");
+			return false;
+		}
+		File workingDirectoryFile = new File(workingDirectory);
+		if(!workingDirectoryFile.exists() || !workingDirectoryFile.isDirectory()) {
+			MessageHandler.showErrorMessage("working directory invalid, or not a directory");
+			return false;
+		}
+		File[] filesInWorkingDir = workingDirectoryFile.listFiles(new FilenameFilter() {
+			@Override
+			public boolean accept(File file, String fileName) {
+				return fileName != null && (fileName.toLowerCase().endsWith(".xls") || fileName.toLowerCase().endsWith(".xlsx"));
+			}
+		});
+		if(filesInWorkingDir.length == 0) {
+			MessageHandler.showErrorMessage("no Excel file found in working directory");
+			return false;
+		}
+		if(filesInWorkingDir.length > 1) {
+			MessageHandler.showErrorMessage("more than one Excel file found in working directory!");
+			return false;
+		}
+		return true;
+	}
+	
+	private boolean verifyAllFields() {
+		if(!verifyWorkingDirectory()) {
+			return false;
+		}
+		if(textFieldUsername.getText() == null || textFieldUsername.getText().trim().length() == 0) {
+			MessageHandler.showErrorMessage("No username specified");
+			return false;
+		}
+		if(textFieldPassword.getText() == null || textFieldPassword.getText().trim().length() == 0) {
+			MessageHandler.showErrorMessage("No password specified");
+			return false;
+		}
+		if(!spreadsheetVerified) {
+			MessageHandler.showErrorMessage("Spreadsheet not yet been successfully verified, please verify first");
+			return false;
+		}
+		return true;
 	}
 }

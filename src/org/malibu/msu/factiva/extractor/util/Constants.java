@@ -18,7 +18,7 @@ public class Constants {
 	private Properties props = new Properties();
 	
 	private Constants() throws IOException {
-		InputStream stream = Constants.class.getResourceAsStream(CONSTANTS_FILE_NAME);
+		InputStream stream = Constants.class.getClassLoader().getResourceAsStream(CONSTANTS_FILE_NAME);
 		props.load(stream);
 		stream.close();
 	}

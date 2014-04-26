@@ -57,14 +57,15 @@ public class MessageHandler {
 			StringBuilder buffer = new StringBuilder();
 			if(mainMessageText != null) {
 				buffer.append(mainMessageText);
-				if(errorMessages.size() > 0) {
-					buffer.append("\n");
-				}
 			}
 			for (String msg : errorMessages) {
+				buffer.append("\n");
 				buffer.append(msg);
 			}
-			JOptionPane.showMessageDialog(primaryParentComponent, buffer.toString());
+			String finalText = buffer.toString();
+			logMessage("Multiple errors occrred");
+			logMessage(finalText);
+			showEditablePopupWindow("Multiple errors occurred",finalText);
 		}
 	}
 	
@@ -93,7 +94,7 @@ public class MessageHandler {
 		completeMessage.append("\n\n");
 		completeMessage.append("If you want to help support this application, \n");
 		completeMessage.append("copy the error text in this message box and email it to: ampp33@gmail.com \n");
-		showEditablePopupWindow(completeMessage.toString());
+		showEditablePopupWindow("Exception",completeMessage.toString());
 		logMessage(completeMessage.toString());
 	}
 	
@@ -109,10 +110,10 @@ public class MessageHandler {
 		}
 	}
 	
-	private static void showEditablePopupWindow(String text) {
+	private static void showEditablePopupWindow(String title, String text) {
 		JPanel panel = new JPanel();
 		JTextArea textArea = new JTextArea(text);
 		panel.add(textArea);
-		JOptionPane.showMessageDialog(null, panel, "My custom dialog", JOptionPane.PLAIN_MESSAGE);
+		JOptionPane.showMessageDialog(null, panel, title, JOptionPane.PLAIN_MESSAGE);
 	}
 }

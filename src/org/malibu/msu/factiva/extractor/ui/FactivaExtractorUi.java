@@ -27,6 +27,9 @@ import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
 
+import org.malibu.msu.factiva.extractor.FactivaExtractorProgressListener;
+import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
+import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
@@ -34,11 +37,9 @@ import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 public class FactivaExtractorUi {
 
 	private JFrame frmFactivaextractorV;
-	private JTextField textFieldUsername;
-	private JTextField textFieldPassword;
 	
-	private String outputDirectory = null;
-
+	private boolean spreadsheetVerified = false;
+	
 	/**
 	 * Launch the application.
 	 */
@@ -98,7 +99,7 @@ public class FactivaExtractorUi {
 		lblUsername.setBounds(260, 121, 63, 16);
 		panel.add(lblUsername);
 
-		textFieldUsername = new JTextField();
+		final JTextField textFieldUsername = new JTextField();
 		textFieldUsername.setBounds(328, 118, 116, 22);
 		panel.add(textFieldUsername);
 		textFieldUsername.setColumns(10);
@@ -107,7 +108,7 @@ public class FactivaExtractorUi {
 		lblPassword.setBounds(449, 121, 60, 16);
 		panel.add(lblPassword);
 
-		textFieldPassword = new JPasswordField();
+		final JTextField textFieldPassword = new JPasswordField();
 		textFieldPassword.setBounds(514, 118, 116, 22);
 		panel.add(textFieldPassword);
 		textFieldPassword.setColumns(10);
@@ -145,6 +146,7 @@ public class FactivaExtractorUi {
 			    } else {
 			    	lblDirectory.setText("<please select a directory>");
 			    }
+			    spreadsheetVerified = false;
 			}
 		});
 		panel.add(btnSelectWorkingDirectory);
@@ -201,8 +203,9 @@ public class FactivaExtractorUi {
 					MessageHandler.handleException("failed to verify Excel file", e1);
 					return;
 				}
-				MessageHandler.showMessage("Excel file validated successfully!");
-				MessageHandler.logMessage("Excel file validated successfully!");
+				MessageHandler.logMessage("Excel file '" + excelFilePath + "' validated successfully!");
+				MessageHandler.showMessage("Excel file '" + excelFilePath + "' validated successfully!");
+				spreadsheetVerified = true;
 			}
 		});
 		btnValidate.setBounds(10, 222, 97, 25);
@@ -213,8 +216,37 @@ public class FactivaExtractorUi {
 		lblStepRun.setFont(new Font("Tahoma", Font.BOLD, 13));
 		lblStepRun.setBounds(10, 253, 325, 16);
 		panel.add(lblStepRun);
-
+		
+		final JProgressBar progressBar = new JProgressBar();
+		final JLabel lblCurrentItem = new JLabel("<item id>");
+		
 		JButton btnRun = new JButton("Run");
+		btnRun.addActionListener(new ActionListener() {
+			@Override
+			public void actionPerformed(ActionEvent arg0) {
+				if(textFieldUsername.getText() == null || textFieldUsername.getText().trim().length() == 0) {
+					MessageHandler.showErrorMessage("No username specified");
+					return;
+				}
+				if(textFieldPassword.getText() == null || textFieldPassword.getText().trim().length() == 0) {
+					MessageHandler.showErrorMessage("No password specified");
+					return;
+				}
+				if(!spreadsheetVerified) {
+					MessageHandler.showErrorMessage("Spreadsheet not yet been successfully verified, please verify first");
+					return;
+				}
+				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
+				progressToken.setListener(new FactivaExtractorProgressListener() {
+					@Override
+					public void progressChanged(FactivaExtractorProgressToken token) {
+						progressBar.setValue(token.getPercentComplete());
+						lblCurrentItem.setText(token.getCurrentId());
+					}
+				});
+				new Thread(new FactivaExtractorThread(null, progressToken)).start();
+			}
+		});
 		btnRun.setBounds(10, 272, 97, 25);
 		panel.add(btnRun);
 
@@ -223,7 +255,6 @@ public class FactivaExtractorUi {
 		lblStepCheck.setBounds(10, 325, 68, 16);
 		panel.add(lblStepCheck);
 
-		JProgressBar progressBar = new JProgressBar();
 		progressBar.setBounds(81, 327, 549, 14);
 		panel.add(progressBar);
 
@@ -241,9 +272,8 @@ public class FactivaExtractorUi {
 		lblLog.setBounds(10, 345, 97, 16);
 		panel.add(lblLog);
 
-		JLabel label = new JLabel("<item id>");
-		label.setBounds(108, 345, 522, 16);
-		panel.add(label);
+		lblCurrentItem.setBounds(108, 345, 522, 16);
+		panel.add(lblCurrentItem);
 
 		JLabel lblLog_1 = new JLabel("Log:");
 		lblLog_1.setFont(new Font("Tahoma", Font.BOLD, 13));

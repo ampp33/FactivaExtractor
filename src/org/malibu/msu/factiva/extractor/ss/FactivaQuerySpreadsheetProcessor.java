@@ -1,6 +1,7 @@
 package org.malibu.msu.factiva.extractor.ss;
 
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.util.ArrayList;
@@ -155,7 +156,8 @@ public class FactivaQuerySpreadsheetProcessor {
 		if(query.getDateRangeTo() == null) {
 			addOrThrowError(errorMessagePrefix + " has no end date, or has an invalid value", errorMessages, throwExceptions);
 		}
-		if(query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime()) {
+		if(query.getDateRangeFrom() != null && query.getDateRangeTo() != null 
+				&& (query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime())) {
 			addOrThrowError(errorMessagePrefix + " has a start date later than the end date", errorMessages, throwExceptions);
 		}
 		return errorMessages;
@@ -225,7 +227,10 @@ public class FactivaQuerySpreadsheetProcessor {
 		
 		// load workbook
 		try {
-			return WorkbookFactory.create(spreadsheetFile);
+			FileInputStream fis = new FileInputStream(spreadsheetFile);
+			Workbook workbook = WorkbookFactory.create(fis);
+			fis.close();
+			return workbook;
 		} catch (Throwable t) {
 			throw new IOException("failed to load spreadsheet", t);
 		}

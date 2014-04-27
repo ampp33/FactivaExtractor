@@ -228,6 +228,7 @@ public class FactivaExtractorUi {
 				});
 				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
 				
+				// TODO: add validation if these don't work
 				// create output directory if it doesn't exist already
 				String outputDirectoryPath = lblDirectory.getText() + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "/";
 				File outputDir = new File(outputDirectoryPath);

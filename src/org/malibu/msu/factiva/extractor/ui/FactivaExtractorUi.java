@@ -228,17 +228,16 @@ public class FactivaExtractorUi {
 				});
 				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
 				
-				// branch change
 				// TODO: add validation if these don't work
 				// create output directory if it doesn't exist already
-				String outputDirectoryPath = lblDirectory.getText() + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "/";
+				String outputDirectoryPath = lblDirectory.getText() + "/" + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "/";
 				File outputDir = new File(outputDirectoryPath);
 				if(!(outputDir.exists() && outputDir.isDirectory())) {
 					outputDir.mkdir();
 				}
 				
 				// create temp download directory if it doesn't exist already
-				String tempDownloadDirPath = lblDirectory.getText() + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "/";
+				String tempDownloadDirPath = lblDirectory.getText() + "/" + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "/";
 				File tempDownloadDir = new File(tempDownloadDirPath);
 				if(!(tempDownloadDir.exists() && tempDownloadDir.isDirectory())) {
 					tempDownloadDir.mkdir();

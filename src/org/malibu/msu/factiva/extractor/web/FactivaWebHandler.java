@@ -119,7 +119,7 @@ public class FactivaWebHandler {
 		checkLoggedIn();
 		
 		try {
-			WebElement searchPageLink = driver.findElement(By.xpath("//*[@id='navmbm0']/a"));
+			WebElement searchPageLink = driver.findElement(By.xpath("//a[@title='Search']"));
 			searchPageLink.click();
 		} catch (NoSuchElementException ex) {
 			throw new FactivaExtractorQueryException("no search page link found");
@@ -176,7 +176,7 @@ public class FactivaWebHandler {
 			Calendar cal = Calendar.getInstance();
 			cal.setTime(query.getDateRangeFrom());
 			WebElement fromMonthTextArea = driver.findElement(By.id("frm"));
-			fromMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH)));
+			fromMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH) + 1));
 			WebElement fromDateTextArea = driver.findElement(By.id("frd"));
 			fromDateTextArea.sendKeys(Integer.toString(cal.get(Calendar.DAY_OF_MONTH)));
 			WebElement fromYearTextArea = driver.findElement(By.id("fry"));
@@ -185,7 +185,7 @@ public class FactivaWebHandler {
 			// set from date
 			cal.setTime(query.getDateRangeTo());
 			WebElement toMonthTextArea = driver.findElement(By.id("tom"));
-			toMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH)));
+			toMonthTextArea.sendKeys(Integer.toString(cal.get(Calendar.MONTH) + 1));
 			WebElement toDateTextArea = driver.findElement(By.id("tod"));
 			toDateTextArea.sendKeys(Integer.toString(cal.get(Calendar.DAY_OF_MONTH)));
 			WebElement toYearTextArea = driver.findElement(By.id("toy"));

@@ -26,6 +26,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
+import javax.swing.text.DefaultCaret;
 
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressListener;
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
@@ -230,18 +231,19 @@ public class FactivaExtractorUi {
 				
 				// TODO: add validation if these don't work
 				// create output directory if it doesn't exist already
-				String outputDirectoryPath = lblDirectory.getText() + "/" + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "/";
+				String outputDirectoryPath = lblDirectory.getText() + "\\" + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "\\";
 				File outputDir = new File(outputDirectoryPath);
 				if(!(outputDir.exists() && outputDir.isDirectory())) {
 					outputDir.mkdir();
 				}
 				
 				// create temp download directory if it doesn't exist already
-				String tempDownloadDirPath = lblDirectory.getText() + "/" + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "/";
+				String tempDownloadDirPath = lblDirectory.getText() + "\\" + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "\\";
 				File tempDownloadDir = new File(tempDownloadDirPath);
 				if(!(tempDownloadDir.exists() && tempDownloadDir.isDirectory())) {
 					tempDownloadDir.mkdir();
 				}
+				// TODO: delete all files in dirs if any exist
 				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
 				progressToken.setListener(new FactivaExtractorProgressListener() {
@@ -286,6 +288,8 @@ public class FactivaExtractorUi {
 				
 		JTextArea logTextArea = new JTextArea(0, 0);
 		logTextArea.setFont(new Font("Trebuchet MS", Font.PLAIN, 13));
+		DefaultCaret caret = (DefaultCaret)logTextArea.getCaret();
+		caret.setUpdatePolicy(DefaultCaret.ALWAYS_UPDATE);
 //		logTextArea.setEditable(false); // set textArea non-editable
 		JScrollPane scroll = new JScrollPane(logTextArea);
 		scroll.setVerticalScrollBarPolicy(ScrollPaneConstants.VERTICAL_SCROLLBAR_AS_NEEDED);

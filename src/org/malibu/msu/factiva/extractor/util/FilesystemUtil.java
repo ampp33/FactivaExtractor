@@ -26,6 +26,10 @@ public class FilesystemUtil {
 		}
 		destStream.close();
 		srcStream.close();
+		// delete source file
+		if(!src.delete()) {
+			throw new IOException("failed to delete source file");
+		}
 	}
 	
 	public static boolean isValidFileName(String potentialFileName) {

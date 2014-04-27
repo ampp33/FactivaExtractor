@@ -9,7 +9,6 @@ import java.util.List;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
-import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -205,7 +204,7 @@ public class FactivaWebHandler {
 		try {
 			WebElement selectAllCheckbox = driver.findElement(By.xpath("//span[@id='selectAll']/input"));
 			selectAllCheckbox.click();
-		} catch (ElementNotFoundException enf) {
+		} catch (ElementNotFoundException | NoSuchElementException enf) {
 			return 0;
 		} catch (Exception e) {
 			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
@@ -230,11 +229,11 @@ public class FactivaWebHandler {
 		// create download destination directory
 		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + "/";
 		File downloadDestDir = new File(downloadDestDirPath);
-		if(!downloadDestDir.mkdir()) {
+		if(!downloadDestDir.exists() && !downloadDestDir.mkdir()) {
 			throw new FactivaExtractorQueryException("failed to create destination directory for downloaded file: " + downloadDestDirPath);
 		}
 		// copy downloaded file to download destination directory
-		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), downloadDestDirPath + Constants.getInstance().getConstant(Constants.DOWNLOADED_FILE_NAME));
+		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), downloadDestDirPath + downloadedFiles[0].getName());
 		
 		return numberOfArticlesDownloaded;
 	}

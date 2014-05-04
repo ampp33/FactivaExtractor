@@ -4,8 +4,6 @@ import java.io.IOException;
 import java.util.List;
 
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
-import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
-import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
@@ -64,28 +62,54 @@ public class FactivaExtractorThread implements Runnable {
 				this.progressToken.setErrorOccurred(true);
 				return;
 			}
+		} catch (Throwable t) {
+			this.progressToken.setStatusMessage("Error occurred starting Factiva");
+			MessageHandler.handleException("Error occurred starting Factiva", t);
+			return;
+		}
+		
+		boolean errorsOccurred = false;
+		int queryNumber = 1;
+		int percentCompletePerQuery = 100/pendingQueries.size();
+		for(FactivaQuery query : pendingQueries) {
+			errorsOccurred = false;
+			this.progressToken.setStatusMessage("Processing query '" + query.getId() + "'...");
 			
-			int queryNumber = 1;
-			int percentCompletePerQuery = 100/pendingQueries.size();
-			for(FactivaQuery query : pendingQueries) {
-				this.progressToken.setStatusMessage("Processing query '" + query.getId() + "'...");
+			// get to search page
+			try {
 				handler.goToSearchPage();
-				
-				// where the magic BEGINS
-				handler.executeQuery(query);
-				
-				this.progressToken.setStatusMessage("Query '" + query.getId() + "' processed successfully!");
-				this.progressToken.setPercentComplete(percentCompletePerQuery * queryNumber);
-				queryNumber++;
+			} catch (Throwable t) {
+				errorsOccurred = true;
+				this.progressToken.setStatusMessage("Error occurred trying to get to search page");
 			}
 			
-			this.progressToken.setStatusMessage("Attempting to log out...");
-			handler.logout();
-			this.progressToken.setStatusMessage("Finished");
-		} catch (FactivaExtractorQueryException | FactivaExtractorWebHandlerException | IOException e) {
-			this.progressToken.setStatusMessage("Error occurred during processing");
-			MessageHandler.handleException("Error occurred during processing", e);
+			// where the magic BEGINS
+			if(!errorsOccurred) {
+				try {
+					handler.executeQuery(query);
+				} catch (Throwable t) {
+					errorsOccurred = true;
+					this.progressToken.setStatusMessage("Error occurred during search");
+				}
+			}
+			
+			// increment progress complete percentage
+			this.progressToken.setPercentComplete(percentCompletePerQuery * queryNumber);
+			queryNumber++;
+			
+			if(!errorsOccurred) {
+				this.progressToken.setStatusMessage("Query '" + query.getId() + "' processed successfully!");
+			}
 		}
+		
+		// log out
+		this.progressToken.setStatusMessage("Attempting to log out...");
+		try {
+			handler.logout();
+		} catch (Throwable t) {
+			this.progressToken.setStatusMessage("Error occurred when attempting to log out: " + t.getMessage());
+		}
+		this.progressToken.setStatusMessage("Finished");
 	}
 
 }

@@ -26,9 +26,9 @@ public class FilesystemUtil {
 		}
 		destStream.close();
 		srcStream.close();
-		// delete source file
+		// TODO: delete source file (currently not working)
 		if(!src.delete()) {
-			throw new IOException("failed to delete source file");
+			throw new IOException("failed to remove source file");
 		}
 	}
 	

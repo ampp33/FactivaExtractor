@@ -211,7 +211,7 @@ public class FactivaExtractorUi {
 		btnRun.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
-				if(!verifyAllFields()) {
+				if(!verifyAll()) {
 					return;
 				}
 				
@@ -300,6 +300,7 @@ public class FactivaExtractorUi {
 	}
 	
 	private boolean verifyWorkingDirectory() {
+		// verify working directory is set and exists
 		String workingDirectory = lblDirectory.getText();
 		if(workingDirectory == null || workingDirectory.trim().length() == 0) {
 			MessageHandler.showErrorMessage("no working directory chosen");
@@ -310,6 +311,14 @@ public class FactivaExtractorUi {
 			MessageHandler.showErrorMessage("working directory invalid, or not a directory");
 			return false;
 		}
+		// verify Firefox profile directory exists
+//		String firefoxProfileDirPath = workingDirectoryFile.getAbsolutePath() + "\\" + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
+//		File firefoxProfileDir = new File(firefoxProfileDirPath);
+//		if(!firefoxProfileDir.exists() || firefoxProfileDir.isDirectory()) {
+//			MessageHandler.showErrorMessage("Firefox profile directory not found in working directory");
+//			return false;
+//		}
+		// verify only one Excel file exists in the working directory
 		File[] filesInWorkingDir = workingDirectoryFile.listFiles(new FilenameFilter() {
 			@Override
 			public boolean accept(File file, String fileName) {
@@ -327,7 +336,7 @@ public class FactivaExtractorUi {
 		return true;
 	}
 	
-	private boolean verifyAllFields() {
+	private boolean verifyAll() {
 		if(!verifyWorkingDirectory()) {
 			return false;
 		}

@@ -227,7 +227,7 @@ public class FactivaWebHandler {
 			throw new FactivaExtractorQueryException("unexpected contents in temp download directory");
 		}
 		// create download destination directory
-		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + "/";
+		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + "\\";
 		File downloadDestDir = new File(downloadDestDirPath);
 		if(!downloadDestDir.exists() && !downloadDestDir.mkdir()) {
 			throw new FactivaExtractorQueryException("failed to create destination directory for downloaded file: " + downloadDestDirPath);

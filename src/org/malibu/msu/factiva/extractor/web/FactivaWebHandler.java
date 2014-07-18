@@ -7,8 +7,10 @@ import java.util.Calendar;
 import java.util.List;
 
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
+import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
+import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.openqa.selenium.By;
 import org.openqa.selenium.NoSuchElementException;
@@ -22,48 +24,55 @@ import com.gargoylesoftware.htmlunit.ElementNotFoundException;
 
 public class FactivaWebHandler {
 	
-	private static final String LOGIN_URL = "https://login.msu.edu?App=ATS_Shibboleth_IdP_Idm";
+//	private static final String LOGIN_URL = "https://login.msu.edu?App=ATS_Shibboleth_IdP_Idm";
 	private static final String GET_TO_FACTIVA_URL = "http://er.lib.msu.edu/notice.cfm?dblistno=008462";
 	
 	private WebDriver driver = null;
-	private boolean loggedIn = false;
 	
 	private String tempDownloadsDirectory = null;
 	private String downloadDestinationDirectory = null;
 	
-	public FactivaWebHandler(String tempDownloadsDirectory, String downloadDestinationDirectory) {
+	public FactivaWebHandler(String tempDownloadsDirectory, String downloadDestinationDirectory, String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
+		// verify supplied directories exist
+		File tempDownloadDir = new File(tempDownloadsDirectory);
+		File downloadDestDir = new File(downloadDestinationDirectory);
+		File firefoxProfileDir = new File(firefoxProfileDirectory);
+		if(!tempDownloadDir.exists() || !tempDownloadDir.isDirectory()) {
+			throw new FactivaExtractorWebHandlerException("invalid temp download directory specified: '" + tempDownloadsDirectory + "'");
+		}
+		if(!downloadDestDir.exists() || !downloadDestDir.isDirectory()) {
+			throw new FactivaExtractorWebHandlerException("invalid download destination directory specified: '" + downloadDestinationDirectory + "'");
+		}
+		if(!firefoxProfileDir.exists() || !firefoxProfileDir.isDirectory()) {
+			throw new FactivaExtractorWebHandlerException("invalid firefox profile directory specified: '" + firefoxProfileDir + "'");
+		}
+		
+		// set class variables
 		this.tempDownloadsDirectory = tempDownloadsDirectory;
 		this.downloadDestinationDirectory = downloadDestinationDirectory;
-		File firefoxProfileFolder = new File("C:\\Users\\Ampp33\\Desktop\\FactivaExtractor\\FirefoxProfile");
+		
+		// initialize firefox profile
+		File firefoxProfileFolder = new File(firefoxProfileDirectory);
 		FirefoxProfile profile = new FirefoxProfile(firefoxProfileFolder);
 		updateFirefoxFileDownloadProperties(profile, tempDownloadsDirectory);
-//		this.driver = new HtmlUnitDriver(true);
 		this.driver = new FirefoxDriver(profile);
-//		this.driver = new ChromeDriver();
 	}
 	
-	public void getToFactivaLoginPage() throws FactivaExtractorQueryException {
-		driver.get(GET_TO_FACTIVA_URL);
-		WebElement factivaLink = driver.findElement(By.xpath("//*[@id=\"maincontainer\"]/h4[5]/a"));
-		if(factivaLink == null) {
-			throw new FactivaExtractorQueryException("unable to find factiva link");
-		}
-		factivaLink.click();
-	}
-	
-	public boolean atLoginPage() {
+	public void getToFactivaLoginPage() throws FactivaExtractorWebHandlerException {
 		try {
-			// try to find login text box
-			driver.findElement(By.id("msu-id"));
-		} catch (Throwable t) {
-			return false;
+			driver.get(GET_TO_FACTIVA_URL);
+		} catch (Exception t) {
+			throw new FactivaExtractorWebHandlerException("failed to load starting point web page");
 		}
-		return true;
+		try {
+			WebElement factivaLink = driver.findElement(By.xpath("//*[@id=\"maincontainer\"]/h4[5]/a"));
+			factivaLink.click();
+		} catch (ElementNotFoundException | NoSuchElementException ex) {
+			throw new FactivaExtractorWebHandlerException("unable to find factiva login page link");
+		}
 	}
 	
-	public void login(String username, String password) throws FactivaExtractorQueryException {
-		driver.get(LOGIN_URL);
-		
+	public void login(String username, String password) throws FactivaExtractorWebHandlerException {
 		try {
 			WebElement usernameElement = driver.findElement(By.id("msu-id"));
 			WebElement passwordElement = driver.findElement(By.id("password"));
@@ -71,8 +80,8 @@ public class FactivaWebHandler {
 			usernameElement.sendKeys(username);
 			passwordElement.sendKeys(password);
 			loginButton.click();
-		} catch (NoSuchElementException ex) {
-			throw new FactivaExtractorQueryException("unable to find login fields or button");
+		} catch (ElementNotFoundException | NoSuchElementException ex) {
+			throw new FactivaExtractorWebHandlerException("unable to find login fields or button");
 		}
 		
 		// wait for factiva login page to load (wait a max of 20 seconds)
@@ -93,61 +102,54 @@ public class FactivaWebHandler {
 		}
 		
 		if(!pageLoaded) {
-			throw new FactivaExtractorQueryException("timed out waiting for login to complete");
+			throw new FactivaExtractorWebHandlerException("timed out waiting for login to complete");
 		}
-		
-		this.loggedIn = true;
 	}
 	
-	public void logout() throws FactivaExtractorQueryException {
-		checkLoggedIn();
-		
+	public void logout() throws FactivaExtractorWebHandlerException {
 		try {
 			// click logout menu
+			// TODO: fix to use better XPath location
 			WebElement logoutMenuLink = driver.findElement(By.xpath("//*[@id='dj_header-wrap']/ul[2]/li/a"));
 			logoutMenuLink.click();
 			// click logout link
 			WebElement logoutLink = driver.findElement(By.className("logout"));
 			logoutLink.click();
-		} catch (NoSuchElementException ex) {
-			throw new FactivaExtractorQueryException("unable to log out, logout links not found");
+		} catch (ElementNotFoundException | NoSuchElementException ex) {
+			throw new FactivaExtractorWebHandlerException("unable to log out, logout links not found");
 		}
 	}
 	
-	public void goToSearchPage() throws FactivaExtractorQueryException {
-		checkLoggedIn();
-		
+	public void goToSearchPage() throws FactivaExtractorWebHandlerException {
 		try {
 			WebElement searchPageLink = driver.findElement(By.xpath("//a[@title='Search']"));
 			searchPageLink.click();
-		} catch (NoSuchElementException ex) {
-			throw new FactivaExtractorQueryException("no search page link found");
+		} catch (ElementNotFoundException | NoSuchElementException ex) {
+			throw new FactivaExtractorWebHandlerException("no search page link found");
 		}
 	}
 	
-	private void checkLoggedIn() throws FactivaExtractorQueryException {
-		if(!this.loggedIn) {
-			throw new FactivaExtractorQueryException("not logged in");
-		}
-	}
-	
-	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException {
+	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException, FactivaExtractorFatalException {
 		// set sources
 		removeAllPublicationsFilter();
 		try {
-			inputTabbedField("scTab", "scTxt", query.getSources());
+			inputFieldsInExpandableSection("scTab", "scTxt", query.getSources());
 		} catch (FactivaExtractorWebHandlerException e) {
-			throw new FactivaExtractorQueryException("failed to set source values", e);
+			throw new FactivaExtractorQueryException("failed to set sources", e);
 		}
 		// set company
 		try {
-			if(query.getCompanyName() != null) {
-				List<String> companyNames = new ArrayList<>();
-				companyNames.add(query.getCompanyName());
-				inputTabbedField("coTab", "coTxt", companyNames);
-			}
+			List<String> companyNames = new ArrayList<>();
+			companyNames.add(query.getCompanyName());
+			inputFieldsInExpandableSection("coTab", "coTxt", companyNames);
 		} catch (FactivaExtractorWebHandlerException e) {
-			throw new FactivaExtractorQueryException("failed to set company value", e);
+			throw new FactivaExtractorQueryException("failed to set companies", e);
+		}
+		// set subjects
+		try {
+			inputFieldsInExpandableSection("coTab", "coTxt", query.getSources());
+		} catch (FactivaExtractorWebHandlerException e) {
+			throw new FactivaExtractorQueryException("failed to set companies", e);
 		}
 		// set search text
 		try {
@@ -161,8 +163,8 @@ public class FactivaWebHandler {
 			}
 			WebElement searchTextArea = driver.findElement(By.id("ftx"));
 			searchTextArea.sendKeys(subjectList.toString());
-		} catch (Throwable t) {
-			throw new FactivaExtractorQueryException("Failed to input search text", t);
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed to input search text", e);
 		}
 		
 		try {
@@ -189,19 +191,20 @@ public class FactivaWebHandler {
 			toDateTextArea.sendKeys(Integer.toString(cal.get(Calendar.DAY_OF_MONTH)));
 			WebElement toYearTextArea = driver.findElement(By.id("toy"));
 			toYearTextArea.sendKeys(Integer.toString(cal.get(Calendar.YEAR)));
-		} catch (Throwable t) {
-			throw new FactivaExtractorQueryException("Failed to set start and end date", t);
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed to set start and end date", e);
 		}
 		
 		try {
 			WebElement searchSubmitButton = driver.findElement(By.xpath("//input[@type='submit']"));
 			searchSubmitButton.click();
-		} catch (Throwable t) {
-			throw new FactivaExtractorQueryException("Failed click 'submit' button", t);
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed click search 'submit' button", e);
 		}
 		
 		// download results to a file
 		try {
+			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
 			WebElement selectAllCheckbox = driver.findElement(By.xpath("//span[@id='selectAll']/input"));
 			selectAllCheckbox.click();
 		} catch (ElementNotFoundException | NoSuchElementException enf) {
@@ -210,7 +213,7 @@ public class FactivaWebHandler {
 			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
 		}
 		
-		int numberOfArticlesDownloaded = 0;
+		int numberOfArticlesDownloaded = -1;
 		try {
 			// click file download button, if available
 			WebElement downloadAsRtfButton = driver.findElement(By.xpath("//li[contains(@class,'ppsrtf')]/a"));
@@ -221,16 +224,44 @@ public class FactivaWebHandler {
 			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
 		}
 		
+		// attempt to determine number of articles found
+		try {
+			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']/text()"));
+			String headlineCountText = headlineCountTextArea.getText(); // will always be of format: Headlines 1 - 5 of 6
+//			WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
+//			String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
+			
+			if(headlineCountText != null) {
+				String[] textSections = headlineCountText.split(" ");
+				if(textSections != null && textSections.length > 0) {
+					String articleCount = textSections[textSections.length - 1];
+					// try to convert count to a number, if possible
+					numberOfArticlesDownloaded = Integer.valueOf(articleCount);
+				}
+			}
+		} catch (Exception e) {
+			// do nothing, non fatal error
+		}
+		
 		// move downloaded file to destination directory with appropriate folder/file name
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
-			throw new FactivaExtractorQueryException("unexpected contents in temp download directory");
+			throw new FactivaExtractorFatalException("unexpected contents in temp download directory");
 		}
 		// create download destination directory
-		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + "\\";
+		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + Constants.FILE_SEPARATOR;
 		File downloadDestDir = new File(downloadDestDirPath);
 		if(!downloadDestDir.exists() && !downloadDestDir.mkdir()) {
 			throw new FactivaExtractorQueryException("failed to create destination directory for downloaded file: " + downloadDestDirPath);
+		}
+		File[] existingResultFiles = new File(downloadDestDirPath).listFiles();
+		if(existingResultFiles != null && existingResultFiles.length > 0) {
+			// remove all existing result files in destination download directory (as a precaution)
+			for (File existingResult : existingResultFiles) {
+				if(!existingResult.delete()) {
+					// TODO: log or do something here
+				}
+			}
 		}
 		// copy downloaded file to download destination directory
 		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), downloadDestDirPath + downloadedFiles[0].getName());
@@ -255,23 +286,35 @@ public class FactivaWebHandler {
 			// click 'remove'
 			WebElement removeButton = driver.findElement(By.xpath("//*[@class='pillOption remove']"));
 			removeButton.click();
-		} catch (Throwable t) {
-			throw new FactivaExtractorWebHandlerException("unable to remove 'All Publications' filter", t);
+		} catch (Exception e) {
+			throw new FactivaExtractorWebHandlerException("unable to remove 'All Publications' filter", e);
 		}
 	}
 	
-	private void inputTabbedField(String tabElementId, String inputElementId, List<String> values) throws FactivaExtractorWebHandlerException {
+	private void inputFieldsInExpandableSection(String tabElementId, String inputElementId, List<String> values) throws FactivaExtractorWebHandlerException {
 		// open tab
-		WebElement tabElement = driver.findElement(By.id(tabElementId));
-		tabElement.click();
+		try {
+			WebElement tabElement = driver.findElement(By.id(tabElementId));
+			tabElement.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorWebHandlerException("unable to click section expander arrow (HTML element ID: '" + tabElementId + "')");
+		}
 		// loop through each search criteria and add it
 		for (String searchString : values) {
 			// input search string
-			WebElement inputElement = driver.findElement(By.id(inputElementId));
-			inputElement.sendKeys(searchString);
+			try {
+				WebElement inputElement = driver.findElement(By.id(inputElementId));
+				inputElement.sendKeys(searchString);
+			} catch (Exception e) {
+				throw new FactivaExtractorWebHandlerException("unable to enter text in autocomplete text area (HTML element ID: '" + inputElementId + "')");
+			}
 			// click first autocomplete item
-			WebElement firstAutocompleteItem = waitForElementByXPath("//div[@class='dj_emg_autosuggest_results scResultPopup'][last()]/table/tbody/tr/td[1]",4000);
-			firstAutocompleteItem.click();
+			try {
+				WebElement firstAutocompleteItem = waitForElementByXPath("//div[@class='dj_emg_autosuggest_results scResultPopup'][last()]/table/tbody/tr/td[1]", 4000);
+				firstAutocompleteItem.click();
+			} catch (Exception e) {
+				throw new FactivaExtractorWebHandlerException("unable to find and click an autocomplete dropdown item");
+			}
 		}
 	}
 	
@@ -281,26 +324,24 @@ public class FactivaWebHandler {
 		boolean elementLoaded = false;
 		int waitTime = 0;
 		while(!elementLoaded && waitTime < maxTimeInMilliseconds) {
-			// wait 2 seconds
+			// wait half a second
 			try { Thread.sleep(500); } catch (InterruptedException e) {}
 			waitTime += 500;
 			
 			try {
-				// look for global nav container
+				// look for element
 				element = driver.findElement(By.xpath(xpath));
 				if(element != null && element.isDisplayed()) {
 					elementLoaded = true;
 				}
-			} catch (Throwable t) {
-				t.printStackTrace();
-			}
+			} catch (Exception e) {}
 		}
 		
 		// check that we were able to find the element
 		if(elementLoaded) {
 			return element;
 		} else {
-			throw new FactivaExtractorWebHandlerException("waited for element '" + xpath + "', but it never appeared");
+			throw new FactivaExtractorWebHandlerException("waited for element '" + xpath + "' for " + maxTimeInMilliseconds + " milliseconds, but it never appeared");
 		}
 	}
 }

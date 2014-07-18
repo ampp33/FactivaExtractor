@@ -8,7 +8,11 @@ import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
 
+import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.Cell;
+import org.apache.poi.ss.usermodel.CellStyle;
+import org.apache.poi.ss.usermodel.DataFormatter;
+import org.apache.poi.ss.usermodel.Font;
 import org.apache.poi.ss.usermodel.FormulaEvaluator;
 import org.apache.poi.ss.usermodel.Row;
 import org.apache.poi.ss.usermodel.Sheet;
@@ -20,6 +24,7 @@ import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 
 public class FactivaQuerySpreadsheetProcessor {
 	
+	private static final DataFormatter formatter = new DataFormatter();
 	private FormulaEvaluator evaluator = null;
 	
 	private static final String SHEET_NAME = "Queries";
@@ -32,6 +37,13 @@ public class FactivaQuerySpreadsheetProcessor {
 	private static final int END_DATE_COLUMN_INDEX = 5;
 	
 	private Workbook workbook = null;
+	
+	private static final String COMMENT_COLUMN_TITLE = "COMMENT";
+	private static final String PROCESSED_COLUMN_TITLE = "PROCESSED";
+	
+	private boolean generatedColumnsCreated = false;
+	private int commentColumnIndex = -1;
+	private int processesedColumnIndex = -1;
 	
 	/**
 	 * Constructor that accepts a file path, and verifies the spreadsheet before
@@ -46,6 +58,65 @@ public class FactivaQuerySpreadsheetProcessor {
 		this.workbook = validateAndLoadWorkbook(filePath);
 		this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 		validateWorkbook(workbook);
+	}
+	
+	public void setCommentForQuery(int queryRow, String comment) {
+		if(queryRow > -1 && comment != null) {
+			if(!generatedColumnsCreated) {
+				setupCommentAndProcessedColumns();
+			}
+			Sheet sheet = workbook.getSheet(SHEET_NAME);
+			Row row = sheet.getRow(queryRow);
+			Cell commentCell = row.getCell(this.commentColumnIndex);
+			if(commentCell == null) {
+				commentCell = row.createCell(this.commentColumnIndex);
+			}
+			commentCell.setCellValue(comment);
+		}
+	}
+	
+	public void setProcessedFlag(int queryRow) {
+		if(queryRow > -1) {
+			if(!generatedColumnsCreated) {
+				setupCommentAndProcessedColumns();
+			}
+			Sheet sheet = workbook.getSheet(SHEET_NAME);
+			Row row = sheet.getRow(queryRow);
+			Cell processedFlagCell = row.getCell(this.processesedColumnIndex);
+			if(processedFlagCell == null) {
+				processedFlagCell = row.createCell(this.processesedColumnIndex);
+			}
+			processedFlagCell.setCellValue("X");
+		}
+	}
+	
+	private void setupCommentAndProcessedColumns() {
+		if(!generatedColumnsCreated) {
+			int lastColumnIndex = 0;
+			Sheet sheet = workbook.getSheet(SHEET_NAME);
+			for(int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
+				if(sheet.getRow(rowIndex).getLastCellNum() > lastColumnIndex) {
+					lastColumnIndex = sheet.getRow(rowIndex).getLastCellNum();
+				}
+			}
+			this.processesedColumnIndex = lastColumnIndex;
+			this.commentColumnIndex = lastColumnIndex + 1;
+			
+			CellStyle boldCellStyle = this.workbook.createCellStyle();
+			Font font = this.workbook.createFont();
+			font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+			boldCellStyle.setFont(font);
+			
+			Row headerRow = sheet.getRow(0);
+			Cell cell = headerRow.createCell(this.processesedColumnIndex);
+			cell.setCellValue(PROCESSED_COLUMN_TITLE);
+			cell.setCellStyle(boldCellStyle);
+			cell = headerRow.createCell(this.commentColumnIndex);
+			cell.setCellValue(COMMENT_COLUMN_TITLE);
+			cell.setCellStyle(boldCellStyle);
+			
+			generatedColumnsCreated = true;
+		}
 	}
 	
 	/**
@@ -82,7 +153,7 @@ public class FactivaQuerySpreadsheetProcessor {
 			currentRow = sheet.getRow(rowIndex);
 			if(currentRow == null) continue;
 			// check if we found a new ID
-			String id = WorkbookUtil.getCellValueAsString(evaluator, currentRow.getCell(ID_COLUMN_INDEX));
+			String id = getCellValueAsString(evaluator, currentRow.getCell(ID_COLUMN_INDEX));
 			if(id != null && !id.equals(currentId)) {
 				// found a new ID
 				currentQuery = new FactivaQuery();
@@ -95,23 +166,23 @@ public class FactivaQuerySpreadsheetProcessor {
 			if(currentQuery == null) {
 				throw new FactivaSpreadsheetException("query at spreadsheet row " + rowIndex + " doesn't have an ID, which is required");
 			}
-			String source = WorkbookUtil.getCellValueAsString(evaluator, currentRow.getCell(SOURCE_COLUMN_INDEX));
+			String source = getCellValueAsString(evaluator, currentRow.getCell(SOURCE_COLUMN_INDEX));
 			if(source != null && source.trim().length() != 0) {
 				currentQuery.getSources().add(source.trim());
 			}
-			String companyName = WorkbookUtil.getCellValueAsString(evaluator, currentRow.getCell(COMPANY_COLUMN_INDEX));
+			String companyName = getCellValueAsString(evaluator, currentRow.getCell(COMPANY_COLUMN_INDEX));
 			if(companyName != null && companyName.trim().length() != 0) {
 				currentQuery.setCompanyName(companyName);
 			}
-			String subject = WorkbookUtil.getCellValueAsString(evaluator, currentRow.getCell(SUBJECT_COLUMN_INDEX));
+			String subject = getCellValueAsString(evaluator, currentRow.getCell(SUBJECT_COLUMN_INDEX));
 			if(subject != null && subject.trim().length() != 0) {
 				currentQuery.getSubjects().add(subject.trim());
 			}
-			Date startDate = WorkbookUtil.getCellValueAsDate(evaluator, currentRow.getCell(START_DATE_COLUMN_INDEX));
+			Date startDate = getCellValueAsDate(evaluator, currentRow.getCell(START_DATE_COLUMN_INDEX));
 			if(startDate != null) {
 				currentQuery.setDateRangeFrom(startDate);
 			}
-			Date endDate = WorkbookUtil.getCellValueAsDate(evaluator, currentRow.getCell(END_DATE_COLUMN_INDEX));
+			Date endDate = getCellValueAsDate(evaluator, currentRow.getCell(END_DATE_COLUMN_INDEX));
 			if(endDate != null) {
 				currentQuery.setDateRangeTo(endDate);
 			}
@@ -212,7 +283,7 @@ public class FactivaQuerySpreadsheetProcessor {
 			if(cell == null) {
 				throw new FactivaSpreadsheetException("Header cell label '" + COLUMNS[columnIndex] + "' doesn't exist");
 			}
-			String value = WorkbookUtil.getCellValueAsString(this.evaluator, cell);
+			String value = getCellValueAsString(this.evaluator, cell);
 			if(!COLUMNS[columnIndex].equalsIgnoreCase(value)) {
 				throw new FactivaSpreadsheetException("Expected header '" + COLUMNS[columnIndex] + "' but found: " + value);
 			}
@@ -250,5 +321,26 @@ public class FactivaQuerySpreadsheetProcessor {
 		} catch (Throwable t) {
 			throw new IOException("failed to load spreadsheet", t);
 		}
+	}
+	
+	private String getCellValueAsString(FormulaEvaluator evaluator, Cell cell) {
+		return cell == null ? null : formatter.formatCellValue(cell, evaluator);
+	}
+	
+	private Date getCellValueAsDate(FormulaEvaluator evaluator, Cell cell) {
+		Date value = null;
+		if(cell != null) {
+			switch(cell.getCellType()) {
+			case Cell.CELL_TYPE_NUMERIC:
+				if (HSSFDateUtil.isCellDateFormatted(cell)) {
+					value = HSSFDateUtil.getJavaDate(cell.getNumericCellValue());
+				}
+				break;
+			case Cell.CELL_TYPE_FORMULA:
+				value = getCellValueAsDate(evaluator, evaluator.evaluateInCell(cell));
+				break;
+			}
+		}
+		return value;
 	}
 }

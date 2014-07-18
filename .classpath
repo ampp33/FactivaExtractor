@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <classpath>
 	<classpathentry kind="src" path="src"/>
+	<classpathentry kind="src" path="test"/>
 	<classpathentry kind="lib" path="lib/poi-3.10-FINAL/commons-codec-1.5.jar"/>
 	<classpathentry kind="lib" path="lib/poi-3.10-FINAL/commons-logging-1.1.jar"/>
 	<classpathentry kind="lib" path="lib/poi-3.10-FINAL/dom4j-1.6.1.jar"/>

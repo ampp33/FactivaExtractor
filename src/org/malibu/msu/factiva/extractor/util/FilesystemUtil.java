@@ -6,6 +6,7 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 
 public class FilesystemUtil {
+	
 	public static final void moveFile(String sourceFile, String destinationFile) throws IOException {
 		File src = new File(sourceFile);
 		File dest = new File(destinationFile);
@@ -43,10 +44,25 @@ public class FilesystemUtil {
 					|| potentialFileName.charAt(i) == '"'
 					|| potentialFileName.charAt(i) == '<'
 					|| potentialFileName.charAt(i) == '>'
-					|| potentialFileName.charAt(i) == '|') {
+					|| potentialFileName.charAt(i) == '|'
+					|| potentialFileName.charAt(i) == ',' /* because of caching mechanism... */) {
 				return false;
 			}
 		}
 		return true;
+	}
+	
+	public static String getJarDirectory() {
+		// get directory .jar file is running from (using substring() to remove leading slash)
+		String workingDir = FilesystemUtil.class.getProtectionDomain().getCodeSource().getLocation().getPath();
+		File file = new File(workingDir);
+		workingDir = file.getAbsolutePath();
+		if(workingDir.startsWith(Constants.FILE_SEPARATOR)) {
+			workingDir = workingDir.substring(1);
+		}
+		if(workingDir.endsWith(".")) {
+			workingDir = workingDir.substring(0, workingDir.length() - 2);
+		}
+		return workingDir;
 	}
 }

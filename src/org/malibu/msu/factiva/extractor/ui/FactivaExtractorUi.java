@@ -35,6 +35,7 @@ import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.util.Constants;
+import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
 
 public class FactivaExtractorUi {
 
@@ -229,21 +230,37 @@ public class FactivaExtractorUi {
 				});
 				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
 				
-				// TODO: add validation if these don't work
 				// create output directory if it doesn't exist already
-				String outputDirectoryPath = lblDirectory.getText() + "\\" + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + "\\";
+				String outputDirectoryPath = lblDirectory.getText() + Constants.FILE_SEPARATOR + Constants.getInstance().getConstant(Constants.DESTINATION_DIRECTORY_NAME) + Constants.FILE_SEPARATOR;
 				File outputDir = new File(outputDirectoryPath);
 				if(!(outputDir.exists() && outputDir.isDirectory())) {
-					outputDir.mkdir();
+					if(!outputDir.mkdir()) {
+						String errorMessage = "error occurred creating output directory: '" + outputDirectoryPath + "'";
+						MessageHandler.showErrorMessage(errorMessage);
+						MessageHandler.logMessage(errorMessage);
+						return;
+					}
 				}
 				
 				// create temp download directory if it doesn't exist already
-				String tempDownloadDirPath = lblDirectory.getText() + "\\" + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + "\\";
+				String tempDownloadDirPath = lblDirectory.getText() + Constants.FILE_SEPARATOR + Constants.getInstance().getConstant(Constants.TEMP_DOWNLOAD_DIRECTORY_NAME) + Constants.FILE_SEPARATOR;
 				File tempDownloadDir = new File(tempDownloadDirPath);
 				if(!(tempDownloadDir.exists() && tempDownloadDir.isDirectory())) {
-					tempDownloadDir.mkdir();
+					if(!tempDownloadDir.mkdir()) {
+						String errorMessage = "error occurred creating temp download directory: '" + tempDownloadDirPath + "'";
+						MessageHandler.showErrorMessage(errorMessage);
+						MessageHandler.logMessage(errorMessage);
+						return;
+					}
 				}
-				// TODO: delete all files in dirs if any exist
+				// check if temp download directory has files in it already, and if it does, alert the user
+				File[] tempDirFiles = tempDownloadDir.listFiles();
+				if(tempDirFiles != null && tempDirFiles.length > 0) {
+					String errorMessage = "temp download directory: '" + tempDownloadDirPath + "' is not empty, please empty this directory";
+					MessageHandler.showErrorMessage(errorMessage);
+					MessageHandler.logMessage(errorMessage);
+					return;
+				}
 				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
 				progressToken.setListener(new FactivaExtractorProgressListener() {
@@ -254,7 +271,17 @@ public class FactivaExtractorUi {
 						MessageHandler.logMessage("(" + token.getPercentComplete() + "%) - " + token.getStatusMessage());
 					}
 				});
-				new Thread(new FactivaExtractorThread(username, password, spreadsheetFilePath, tempDownloadDirPath, outputDirectoryPath, progressToken)).start();
+				
+				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
+				config.setUsername(username);
+				config.setPassword(password);
+				config.setSpreadsheetFilePath(spreadsheetFilePath);
+				config.setTempDownloadDirPath(tempDownloadDirPath);
+				config.setDestinationDirPath(outputDirectoryPath);
+				config.setFirefoxProfileDirPath(workingDir.getAbsolutePath() + "\\FirefoxProfile");
+				config.setProgressToken(progressToken);
+				
+				new Thread(new FactivaExtractorThread(config)).start();
 			}
 		});
 		btnRun.setBounds(10, 272, 97, 25);
@@ -312,7 +339,7 @@ public class FactivaExtractorUi {
 			return false;
 		}
 		// verify Firefox profile directory exists
-//		String firefoxProfileDirPath = workingDirectoryFile.getAbsolutePath() + "\\" + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
+//		String firefoxProfileDirPath = workingDirectoryFile.getAbsolutePath() + Constants.FILE_SEPARATOR + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
 //		File firefoxProfileDir = new File(firefoxProfileDirPath);
 //		if(!firefoxProfileDir.exists() || firefoxProfileDir.isDirectory()) {
 //			MessageHandler.showErrorMessage("Firefox profile directory not found in working directory");

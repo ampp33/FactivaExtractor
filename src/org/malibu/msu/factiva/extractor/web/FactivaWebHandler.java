@@ -1,10 +1,15 @@
 package org.malibu.msu.factiva.extractor.web;
 
 import java.io.File;
+import java.io.FileInputStream;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Calendar;
 import java.util.List;
+
+import javax.swing.text.Document;
+import javax.swing.text.rtf.RTFEditorKit;
 
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
@@ -26,6 +31,8 @@ public class FactivaWebHandler {
 	
 //	private static final String LOGIN_URL = "https://login.msu.edu?App=ATS_Shibboleth_IdP_Idm";
 	private static final String GET_TO_FACTIVA_URL = "http://er.lib.msu.edu/notice.cfm?dblistno=008462";
+	
+	private static final int MAX_DOWNLOAD_WAIT_TIME = 180000;
 	
 	private WebDriver driver = null;
 	
@@ -147,24 +154,9 @@ public class FactivaWebHandler {
 		}
 		// set subjects
 		try {
-			inputFieldsInExpandableSection("coTab", "coTxt", query.getSources());
+			inputFieldsInExpandableSection("nsTab", "nsTxt", query.getSubjects());
 		} catch (FactivaExtractorWebHandlerException e) {
-			throw new FactivaExtractorQueryException("failed to set companies", e);
-		}
-		// set search text
-		try {
-			// TODO: is comma separated correct?
-			StringBuilder subjectList = new StringBuilder();
-			String comma = "";
-			for(String subject : query.getSubjects()) {
-				subjectList.append(comma);
-				subjectList.append(subject);
-				comma = ",";
-			}
-			WebElement searchTextArea = driver.findElement(By.id("ftx"));
-			searchTextArea.sendKeys(subjectList.toString());
-		} catch (Exception e) {
-			throw new FactivaExtractorQueryException("Failed to input search text", e);
+			throw new FactivaExtractorQueryException("failed to set subjects", e);
 		}
 		
 		try {
@@ -243,28 +235,55 @@ public class FactivaWebHandler {
 			// do nothing, non fatal error
 		}
 		
-		// move downloaded file to destination directory with appropriate folder/file name
+		// check that only one file exists in the download directory
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+		
+		// if .part file still exists in download directory, wait for it to go away (wait 3 minutes max)
+		int millisecondsWaited = 0;
+		while(downloadedFiles.length == 2 && (downloadedFiles[0].getName().endsWith(".part") || downloadedFiles[1].getName().endsWith(".part")) && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
+			try { Thread.sleep(500); } catch (InterruptedException e) {}
+			// refresh file list
+			millisecondsWaited += 500;
+			downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+		}
+		
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
 			throw new FactivaExtractorFatalException("unexpected contents in temp download directory");
 		}
-		// create download destination directory
-		String downloadDestDirPath = this.downloadDestinationDirectory + query.getId() + Constants.FILE_SEPARATOR;
-		File downloadDestDir = new File(downloadDestDirPath);
-		if(!downloadDestDir.exists() && !downloadDestDir.mkdir()) {
-			throw new FactivaExtractorQueryException("failed to create destination directory for downloaded file: " + downloadDestDirPath);
-		}
-		File[] existingResultFiles = new File(downloadDestDirPath).listFiles();
-		if(existingResultFiles != null && existingResultFiles.length > 0) {
-			// remove all existing result files in destination download directory (as a precaution)
-			for (File existingResult : existingResultFiles) {
-				if(!existingResult.delete()) {
-					// TODO: log or do something here
-				}
+		
+		String downloadRtfFileAbsPath = downloadedFiles[0].getAbsolutePath();
+		String downloadTxtFileAbsPath = downloadedFiles[0].getAbsoluteFile().getParentFile().getAbsolutePath() + Constants.FILE_SEPARATOR + query.getId() + ".txt";
+		
+		// convert rtf file to txt
+		FileInputStream rtfInputStream = null;
+		FileWriter outputTxtFileStream = null;
+		try {
+			RTFEditorKit rtfParser = new RTFEditorKit();
+			Document txtDoc = rtfParser.createDefaultDocument();
+			rtfInputStream = new FileInputStream(downloadRtfFileAbsPath);
+			rtfParser.read(rtfInputStream, txtDoc, 0);
+			String text = txtDoc.getText(0, txtDoc.getLength());
+			outputTxtFileStream = new FileWriter(new File(downloadTxtFileAbsPath));
+			outputTxtFileStream.write(text);
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("failed convert file from .rtf to .txt", e);
+		} finally {
+			if(rtfInputStream != null) {
+				try { rtfInputStream.close(); } catch (Exception e) {}
+			}
+			if(outputTxtFileStream != null) {
+				try { outputTxtFileStream.close(); } catch (Exception e) {}
 			}
 		}
-		// copy downloaded file to download destination directory
-		FilesystemUtil.moveFile(downloadedFiles[0].getAbsolutePath(), downloadDestDirPath + downloadedFiles[0].getName());
+		
+		// delete rtf file
+		if(!new File(downloadRtfFileAbsPath).delete()) {
+			throw new FactivaExtractorFatalException("failed to delete original rtf file: '" + downloadRtfFileAbsPath + "'");
+		}
+		
+		// move downloaded file to destination directory
+		String finalFileName = new File(downloadTxtFileAbsPath).getName();
+		FilesystemUtil.moveFile(downloadTxtFileAbsPath, this.downloadDestinationDirectory + finalFileName);
 		
 		return numberOfArticlesDownloaded;
 	}

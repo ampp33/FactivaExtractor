@@ -353,11 +353,11 @@ public class FactivaExtractorUi {
 			}
 		});
 		if(filesInWorkingDir.length == 0) {
-			MessageHandler.showErrorMessage("no Excel file found in working directory");
+			MessageHandler.showErrorMessage("No Excel file found in working directory");
 			return false;
 		}
 		if(filesInWorkingDir.length > 1) {
-			MessageHandler.showErrorMessage("more than one Excel file found in working directory!");
+			MessageHandler.showErrorMessage("More than one Excel file found in working directory, or file is open in Excel!");
 			return false;
 		}
 		return true;

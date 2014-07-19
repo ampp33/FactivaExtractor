@@ -243,8 +243,8 @@ public class FactivaWebHandler {
 		while(downloadedFiles.length == 2 && (downloadedFiles[0].getName().endsWith(".part") || downloadedFiles[1].getName().endsWith(".part")) && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
 			try { Thread.sleep(500); } catch (InterruptedException e) {}
 			// refresh file list
-			millisecondsWaited += 500;
 			downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+			millisecondsWaited += 500;
 		}
 		
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
@@ -286,6 +286,10 @@ public class FactivaWebHandler {
 		FilesystemUtil.moveFile(downloadTxtFileAbsPath, this.downloadDestinationDirectory + finalFileName);
 		
 		return numberOfArticlesDownloaded;
+	}
+	
+	public void closeWebWindow() {
+		this.driver.close();
 	}
 	
 	// UPDATE TO SAVE TO A SPECIFIC DIRECTORY ALWAYS, AND _MOVE_ THE FILE AFTER THE DOWNLOAD IS DONE.  GLORIOUS, THOUGH,

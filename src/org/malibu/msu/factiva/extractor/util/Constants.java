@@ -12,6 +12,7 @@ public class Constants {
 	public static final String DESTINATION_DIRECTORY_NAME = "DESTINATION_DIRECTORY_NAME";
 	public static final String TEMP_DOWNLOAD_DIRECTORY_NAME = "TEMP_DOWNLOAD_DIRECTORY_NAME";
 	public static final String DOWNLOADED_FILE_NAME = "DOWNLOADED_FILE_NAME";
+	public static final String OVERRIDE_FIREFOX_PROFILE_DIR = "OVERRIDE_FIREFOX_PROFILE_DIR";
 	public static final String FIREFOX_PROFILE_DIR_NAME = "FIREFOX_PROFILE_DIR_NAME";
 	public static final String FILE_SEPARATOR = System.getProperty("file.separator");
 	

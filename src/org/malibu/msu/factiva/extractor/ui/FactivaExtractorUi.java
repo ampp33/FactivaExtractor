@@ -35,6 +35,7 @@ import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.util.Constants;
+import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
 
 public class FactivaExtractorUi {
@@ -45,6 +46,7 @@ public class FactivaExtractorUi {
 	private JTextField textFieldPassword;
 	
 	private boolean spreadsheetVerified = false;
+	private JTextField textField;
 	
 	
 	/**
@@ -84,14 +86,14 @@ public class FactivaExtractorUi {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
 		frmFactivaextractorV.setTitle("FactivaExtractor v1.0");
-		frmFactivaextractorV.setBounds(100, 100, 650, 500);
+		frmFactivaextractorV.setBounds(100, 100, 650, 681);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
 		
 		final JFrame mainFrame = frmFactivaextractorV;
 		
 		JPanel panel = new JPanel();
-		panel.setBounds(0, 0, 644, 469);
+		panel.setBounds(0, 0, 644, 648);
 		panel.setBackground(Color.WHITE);
 		frmFactivaextractorV.getContentPane().add(panel);
 		panel.setLayout(null);
@@ -200,9 +202,9 @@ public class FactivaExtractorUi {
 		panel.add(btnValidate);
 
 		JLabel lblStepRun = new JLabel(
-				"Step 4: Run (will display status messages below)");
+				"Step 6: Run (will display status messages below)");
 		lblStepRun.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepRun.setBounds(10, 253, 325, 16);
+		lblStepRun.setBounds(10, 368, 325, 16);
 		panel.add(lblStepRun);
 		
 		final JProgressBar progressBar = new JProgressBar();
@@ -262,6 +264,14 @@ public class FactivaExtractorUi {
 					return;
 				}
 				
+				// get firefox profile dir location, depending on whether or not it's location is overridden
+				String fireFoxProfileDirPath = null;
+				if(System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) != null) {
+					fireFoxProfileDirPath = System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
+				} else {
+					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FIREFOX_PROFILE_DIR_NAME;
+				}
+				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
 				progressToken.setListener(new FactivaExtractorProgressListener() {
 					@Override
@@ -278,38 +288,38 @@ public class FactivaExtractorUi {
 				config.setSpreadsheetFilePath(spreadsheetFilePath);
 				config.setTempDownloadDirPath(tempDownloadDirPath);
 				config.setDestinationDirPath(outputDirectoryPath);
-				config.setFirefoxProfileDirPath(workingDir.getAbsolutePath() + "\\FirefoxProfile");
+				config.setFirefoxProfileDirPath(fireFoxProfileDirPath);
 				config.setProgressToken(progressToken);
 				
 				new Thread(new FactivaExtractorThread(config)).start();
 			}
 		});
-		btnRun.setBounds(10, 272, 97, 25);
+		btnRun.setBounds(10, 387, 97, 25);
 		panel.add(btnRun);
 
 		JLabel lblStepCheck = new JLabel("Progress:");
 		lblStepCheck.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepCheck.setBounds(10, 325, 68, 16);
+		lblStepCheck.setBounds(10, 444, 68, 16);
 		panel.add(lblStepCheck);
 
-		progressBar.setBounds(81, 327, 549, 14);
+		progressBar.setBounds(81, 446, 549, 14);
 		panel.add(progressBar);
 
 		JLabel lblStatus = new JLabel("Status:");
 		lblStatus.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStatus.setBounds(10, 306, 68, 16);
+		lblStatus.setBounds(10, 425, 68, 16);
 		panel.add(lblStatus);
 
-		lblStatusMessage.setBounds(81, 306, 549, 16);
+		lblStatusMessage.setBounds(81, 425, 549, 16);
 		panel.add(lblStatusMessage);
 
 		JLabel lblLog_1 = new JLabel("Log:");
 		lblLog_1.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblLog_1.setBounds(10, 350, 33, 16);
+		lblLog_1.setBounds(10, 473, 33, 16);
 		panel.add(lblLog_1);
 		
 		JPanel panel_1 = new JPanel();
-		panel_1.setBounds(45, 351, 587, 103);
+		panel_1.setBounds(43, 473, 587, 162);
 		panel.add(panel_1);
 		panel_1.setLayout(new BorderLayout(0, 0));
 				
@@ -324,6 +334,29 @@ public class FactivaExtractorUi {
 		panel_1.add(scroll, BorderLayout.CENTER);
 		
 		MessageHandler.setLogTextArea(logTextArea);
+		
+		JLabel lblStepoptional = new JLabel("Step 4 (optional): Validate spreadsheet Source, Company, and Subjects");
+		lblStepoptional.setFont(new Font("Tahoma", Font.BOLD, 13));
+		lblStepoptional.setBounds(10, 260, 587, 16);
+		panel.add(lblStepoptional);
+		
+		JButton btnValidate_1 = new JButton("Validate");
+		btnValidate_1.setBounds(10, 283, 97, 25);
+		panel.add(btnValidate_1);
+		
+		JLabel lblStepoptional_1 = new JLabel("Step 5 (optional): Specify an email address to email an alert if this monitor runs into errors");
+		lblStepoptional_1.setFont(new Font("Tahoma", Font.BOLD, 13));
+		lblStepoptional_1.setBounds(10, 316, 604, 16);
+		panel.add(lblStepoptional_1);
+		
+		JLabel lblEmailAddress = new JLabel("Email address:");
+		lblEmailAddress.setBounds(10, 339, 97, 16);
+		panel.add(lblEmailAddress);
+		
+		textField = new JTextField();
+		textField.setBounds(106, 336, 217, 22);
+		panel.add(textField);
+		textField.setColumns(10);
 	}
 	
 	private boolean verifyWorkingDirectory() {

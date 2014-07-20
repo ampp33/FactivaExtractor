@@ -34,35 +34,46 @@ public class FactivaWebHandler {
 	
 	private static final int MAX_DOWNLOAD_WAIT_TIME = 180000;
 	
+	private FirefoxProfile profile = null;
 	private WebDriver driver = null;
 	
 	private String tempDownloadsDirectory = null;
 	private String downloadDestinationDirectory = null;
 	
+	public FactivaWebHandler(String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
+		File firefoxProfileDir = new File(firefoxProfileDirectory);
+		if(!firefoxProfileDir.exists() || !firefoxProfileDir.isDirectory()) {
+			throw new FactivaExtractorWebHandlerException("invalid firefox profile directory specified: '" + firefoxProfileDir + "'");
+		}
+		
+		// initialize firefox profile
+		File firefoxProfileFolder = new File(firefoxProfileDirectory);
+		FirefoxProfile profile = new FirefoxProfile(firefoxProfileFolder);
+		
+		this.profile = profile;
+		this.driver = new FirefoxDriver(profile);
+	}
+	
 	public FactivaWebHandler(String tempDownloadsDirectory, String downloadDestinationDirectory, String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
+		this(firefoxProfileDirectory);
+		
 		// verify supplied directories exist
 		File tempDownloadDir = new File(tempDownloadsDirectory);
 		File downloadDestDir = new File(downloadDestinationDirectory);
-		File firefoxProfileDir = new File(firefoxProfileDirectory);
+		
 		if(!tempDownloadDir.exists() || !tempDownloadDir.isDirectory()) {
 			throw new FactivaExtractorWebHandlerException("invalid temp download directory specified: '" + tempDownloadsDirectory + "'");
 		}
 		if(!downloadDestDir.exists() || !downloadDestDir.isDirectory()) {
 			throw new FactivaExtractorWebHandlerException("invalid download destination directory specified: '" + downloadDestinationDirectory + "'");
 		}
-		if(!firefoxProfileDir.exists() || !firefoxProfileDir.isDirectory()) {
-			throw new FactivaExtractorWebHandlerException("invalid firefox profile directory specified: '" + firefoxProfileDir + "'");
-		}
 		
 		// set class variables
 		this.tempDownloadsDirectory = tempDownloadsDirectory;
 		this.downloadDestinationDirectory = downloadDestinationDirectory;
 		
-		// initialize firefox profile
-		File firefoxProfileFolder = new File(firefoxProfileDirectory);
-		FirefoxProfile profile = new FirefoxProfile(firefoxProfileFolder);
-		updateFirefoxFileDownloadProperties(profile, tempDownloadsDirectory);
-		this.driver = new FirefoxDriver(profile);
+		// update downlod dir in firefox profile
+		updateFirefoxFileDownloadProperties(this.profile, tempDownloadsDirectory);
 	}
 	
 	public void getToFactivaLoginPage() throws FactivaExtractorWebHandlerException {
@@ -288,6 +299,34 @@ public class FactivaWebHandler {
 		return numberOfArticlesDownloaded;
 	}
 	
+	public void testSearchFilter(String tabElementId, String inputElementId, String listId, String value) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException {
+		// attempt to add filter (expands filter area)
+		try {
+			List<String> filterNames = new ArrayList<>();
+			filterNames.add(value);
+			inputFieldsInExpandableSection(tabElementId, inputElementId, filterNames);
+		} catch (FactivaExtractorWebHandlerException e) {
+			throw new FactivaExtractorQueryException("unable to set filter");
+		}
+		// attempt to remove filter
+		try {
+			WebElement element = driver.findElement(By.xpath("//*[@id='" + listId + "']/div/ul/li[1]/div"));
+			element.click();
+			// click 'remove'
+			WebElement removeButton = driver.findElement(By.xpath("//*[@class='pillOption remove']"));
+			removeButton.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorWebHandlerException("unable to remove filter");
+		}
+		// collapse filter area
+		try {
+			WebElement tabElement = driver.findElement(By.id(tabElementId));
+			tabElement.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Unable to re-collapse filter area");
+		}
+	}
+	
 	public void closeWebWindow() {
 		this.driver.close();
 	}
@@ -301,7 +340,7 @@ public class FactivaWebHandler {
 		profile.setPreference("browser.helperApps.neverAsk.saveToDisk", "application/rtf");
 	}
 	
-	private void removeAllPublicationsFilter() throws FactivaExtractorWebHandlerException {
+	public void removeAllPublicationsFilter() throws FactivaExtractorWebHandlerException {
 		try {
 			// look for 'All Publications' filter that we want to remove
 			WebElement element = driver.findElement(By.xpath("//*[@id='scLst']/div/ul/li[1]/div"));

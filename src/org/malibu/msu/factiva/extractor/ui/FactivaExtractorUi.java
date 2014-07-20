@@ -31,6 +31,7 @@ import javax.swing.text.DefaultCaret;
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressListener;
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
 import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
+import org.malibu.msu.factiva.extractor.FactivaKeywordValidatorThread;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
@@ -341,6 +342,55 @@ public class FactivaExtractorUi {
 		panel.add(lblStepoptional);
 		
 		JButton btnValidate_1 = new JButton("Validate");
+		btnValidate_1.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if(!verifyAll()) {
+					return;
+				}
+				
+				// get username and password
+				String username = textFieldUsername.getText();
+				String password = textFieldPassword.getText();
+				
+				// get spreadsheet file path
+				File workingDir = new File(lblDirectory.getText());
+				File[] filesInWorkingDir = workingDir.listFiles(new FilenameFilter() {
+					@Override
+					public boolean accept(File file, String fileName) {
+						return fileName != null && (fileName.toLowerCase().endsWith(".xls") || fileName.toLowerCase().endsWith(".xlsx"));
+					}
+				});
+				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
+				
+				
+				// get firefox profile dir location, depending on whether or not it's location is overridden
+				String fireFoxProfileDirPath = null;
+				if(System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) != null) {
+					fireFoxProfileDirPath = System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
+				} else {
+					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FIREFOX_PROFILE_DIR_NAME;
+				}
+				
+				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
+				progressToken.setListener(new FactivaExtractorProgressListener() {
+					@Override
+					public void stateChanged(FactivaExtractorProgressToken token) {
+						progressBar.setValue(token.getPercentComplete());
+						lblStatusMessage.setText(token.getStatusMessage());
+						MessageHandler.logMessage("(" + token.getPercentComplete() + "%) - " + token.getStatusMessage());
+					}
+				});
+				
+				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
+				config.setUsername(username);
+				config.setPassword(password);
+				config.setSpreadsheetFilePath(spreadsheetFilePath);
+				config.setFirefoxProfileDirPath(fireFoxProfileDirPath);
+				config.setProgressToken(progressToken);
+				
+				new Thread(new FactivaKeywordValidatorThread(config)).start();
+			}
+		});
 		btnValidate_1.setBounds(10, 283, 97, 25);
 		panel.add(btnValidate_1);
 		

@@ -15,15 +15,16 @@ import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
 
 public class FactivaKeywordValidatorThread implements Runnable {
 	
+	private static List<String> verifiedSourceFilters = new ArrayList<>();
+	private static List<String> verifiedCompanyFilters = new ArrayList<>();
+	private static List<String> verifiedSubjectFilters = new ArrayList<>();
+	
 	private String username = null;
 	private String password = null;
 	private String spreadsheetFilePath = null;
 	private String firefoxProfileDirPath = null;
 	private FactivaExtractorProgressToken progressToken = null;
 	
-	private static List<String> verifiedSourceFilters = new ArrayList<>();
-	private static List<String> verifiedCompanyFilters = new ArrayList<>();
-	private static List<String> verifiedSubjectFilters = new ArrayList<>();
 	
 	public FactivaKeywordValidatorThread(FactivaWebHandlerConfig config) {
 		this.username = config.getUsername();
@@ -38,6 +39,7 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		// load queries from spreadsheet
 		List<FactivaQuery> queriesPendingValidation = null;
 		try {
+			this.progressToken.setStatusMessage("Getting queries from spreadsheet");
 			FactivaQuerySpreadsheetProcessor spreadsheet = new FactivaQuerySpreadsheetProcessor(this.spreadsheetFilePath);
 			queriesPendingValidation = spreadsheet.getQueriesFromSpreadsheet(true);
 		} catch (IOException | FactivaSpreadsheetException e1) {
@@ -78,7 +80,7 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		}
 		
 		// begin processing
-		this.progressToken.setStatusMessage("Starting Firefox session...");
+		this.progressToken.setStatusMessage("Starting Firefox session");
 		FactivaWebHandler handler = null;
 		try {
 			handler = new FactivaWebHandler(this.firefoxProfileDirPath);
@@ -98,14 +100,18 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		}
 		// get to search page
 		try {
+			this.progressToken.setStatusMessage("Attempting to get to search page");
 			handler.goToSearchPage();
 		} catch (Exception e) {
 			this.progressToken.setStatusMessage("Error occurred trying to get to search page: " + e.getMessage());
 			return;
 		}
 		
+		int totalFiltersToVerify = sourceFilters.size() + companyFilters.size() + subjectFilters.size();
+		int filtersVerified = 0;
+		
 		// verify sources
-		MessageHandler.logMessage("Verifying source filters (" + sourceFilters.size() + ")");
+		this.progressToken.setStatusMessage("Verifying source filters (" + sourceFilters.size() + ")");
 		try {
 			MessageHandler.logMessage("Attempting to remove initial 'All Publications' source filter");
 			handler.removeAllPublicationsFilter();
@@ -118,6 +124,7 @@ public class FactivaKeywordValidatorThread implements Runnable {
 				MessageHandler.logMessage("Verifying source '" + source + "'");
 				handler.testSearchFilter("scTab", "scTxt", "scLst", source);
 				verifiedSourceFilters.add(source);
+				this.progressToken.setPercentComplete(((++filtersVerified * 100)/totalFiltersToVerify));
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
@@ -128,15 +135,16 @@ public class FactivaKeywordValidatorThread implements Runnable {
 				return;
 			}
 		}
-		MessageHandler.logMessage("done verifying source filters");
+		this.progressToken.setStatusMessage("done verifying source filters");
 		
 		// verify companies
-		MessageHandler.logMessage("Verifying company filters (" + companyFilters.size() + ")");
+		this.progressToken.setStatusMessage("Verifying company filters (" + companyFilters.size() + ")");
 		for (String company : companyFilters) {
 			try {
 				MessageHandler.logMessage("Verifying company '" + company + "'");
 				handler.testSearchFilter("coTab", "coTxt", "coLst", company);
 				verifiedCompanyFilters.add(company);
+				this.progressToken.setPercentComplete(((++filtersVerified * 100)/totalFiltersToVerify));
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
@@ -147,15 +155,16 @@ public class FactivaKeywordValidatorThread implements Runnable {
 				return;
 			}
 		}
-		MessageHandler.logMessage("done verifying company filters");
+		this.progressToken.setStatusMessage("done verifying company filters");
 		
 		// verify subjects
-		MessageHandler.logMessage("Verifying subject filters (" + subjectFilters.size() + ")");
+		this.progressToken.setStatusMessage("Verifying subject filters (" + subjectFilters.size() + ")");
 		for (String subject : subjectFilters) {
 			try {
 				MessageHandler.logMessage("Verifying subject '" + subject + "'");
 				handler.testSearchFilter("nsTab", "nsTxt", "nsLst", subject);
 				verifiedSubjectFilters.add(subject);
+				this.progressToken.setPercentComplete(((++filtersVerified * 100)/totalFiltersToVerify));
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
@@ -166,13 +175,13 @@ public class FactivaKeywordValidatorThread implements Runnable {
 				return;
 			}
 		}
-		MessageHandler.logMessage("done verifying subject filters");
+		this.progressToken.setStatusMessage("done verifying subject filters");
 		
 		// close Factiva
 		handler.closeWebWindow();
 		
 		this.progressToken.setPercentComplete(100);
-		this.progressToken.setStatusMessage("Finished");
+		this.progressToken.setStatusMessage("All sources, companies, and subjects verified successfully");
 	}
 	
 	private void reportExceptionToUi(String message, int percentComplete, Exception e) {

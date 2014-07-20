@@ -7,6 +7,8 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 
+import org.malibu.msu.factiva.extractor.util.Constants;
+
 public class FactivaQueryProgressCache {
 	
 	public static final String CACHE_FILE_NAME = "cache.txt";
@@ -19,16 +21,20 @@ public class FactivaQueryProgressCache {
 			throw new FileNotFoundException("directory doesn't exist, or isn't a directory");
 		}
 		// open file in append mode
-		this.cacheFilePath = workingDir.getAbsolutePath() + CACHE_FILE_NAME;
+		this.cacheFilePath = workingDir.getAbsolutePath() + Constants.FILE_SEPARATOR + CACHE_FILE_NAME;
 		this.outputStream = new FileWriter(cacheFilePath, true);
 	}
 	
-	public void cacheFactivaQueryProgress(String queryId, int queryRow, boolean isProcessed) throws IOException {
-		this.outputStream.write(queryId + ":" + queryRow + ",isProcessed," + isProcessed + "\n");
+	public void cacheFactivaQueryProgress(String queryId, int queryRow, boolean isProcessed, int resultCount, String comment) throws IOException {
+		this.outputStream.write(queryId + ":" + queryRow + ":" + isProcessed + ":" + resultCount + ":" + comment + "\n");
+		this.outputStream.flush();
 	}
 	
-	public void cacheFactivaQueryProgress(String queryId, int queryRow, String comment) throws IOException {
-		this.outputStream.write(queryId + ":" + queryRow + ",comment," + comment + "\n");
+	public void deleteCache() throws IOException {
+		close();
+		if(!new File(this.cacheFilePath).delete()) {
+			throw new IOException("failed to delete cache file");
+		}
 	}
 	
 	public void close() throws IOException {
@@ -52,13 +58,14 @@ public class FactivaQueryProgressCache {
 				String[] entry = parseEntry(line);
 				//String queryId = entry[0];
 				int queryLineNo = Integer.parseInt(entry[1]);
-				String fieldName = entry[2];
-				String fieldValue = entry[3];
-				if("isProcessed".equals(fieldName)) {
+				boolean isProcessed = Boolean.parseBoolean(entry[2]);
+				int resultCount = Integer.parseInt(entry[3]);
+				String comment = entry[4];
+				if(isProcessed) {
 					spreadsheet.setProcessedFlag(queryLineNo);
-				} else if ("comment".equals(fieldName)) {
-					spreadsheet.setCommentForQuery(queryLineNo, fieldValue);
+					spreadsheet.setResultCount(queryLineNo, resultCount);
 				}
+				spreadsheet.setCommentForQuery(queryLineNo, comment);
 			}
 		} finally {
 			if(reader != null) {
@@ -70,13 +77,13 @@ public class FactivaQueryProgressCache {
 	}
 	
 	private String[] parseEntry(String line) {
-		String[] result = new String[4];
+		String[] result = new String[5];
 		// line format:
-		// queryId,queryLineNumber,fieldName,fieldValue
-		for(int i = 0; i < 3; i++) {
-			int index = line.indexOf(',');
+		// queryId:queryLineNumber:isProcessed:comment
+		for(int i = 0; i < 4; i++) {
+			int index = line.indexOf(':');
 			result[i] = line.substring(0, index);
-			line = line.substring(index + 1, line.length());
+			line = line.substring(index + 1);
 		}
 		result[3] = line;
 		

@@ -17,15 +17,18 @@ public class FactivaExtractorThread implements Runnable {
 	
 	private String username = null;
 	private String password = null;
+	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
 	private String tempDownloadDirPath = null;
 	private String destinationDirPath = null;
 	private String firefoxProfileDirPath = null;
 	private FactivaExtractorProgressToken progressToken = null;
 	
+	
 	public FactivaExtractorThread(FactivaWebHandlerConfig config) {
 		this.username = config.getUsername();
 		this.password = config.getPassword();
+		this.workingDirPath = config.getWorkingDirPath();
 		this.spreadsheetFilePath = config.getSpreadsheetFilePath();
 		this.tempDownloadDirPath = config.getTempDownloadDirPath();
 		this.destinationDirPath = config.getDestinationDirPath();
@@ -39,7 +42,7 @@ public class FactivaExtractorThread implements Runnable {
 		FactivaQueryProgressCache progressCache = null;
 		List<FactivaQuery> pendingQueries = null;
 		try {
-			progressCache = new FactivaQueryProgressCache(this.destinationDirPath);
+			progressCache = new FactivaQueryProgressCache(this.workingDirPath);
 			spreadsheet = new FactivaQuerySpreadsheetProcessor(this.spreadsheetFilePath);
 			pendingQueries = spreadsheet.getQueriesFromSpreadsheet(true);
 		} catch (IOException | FactivaSpreadsheetException e1) {
@@ -67,63 +70,72 @@ public class FactivaExtractorThread implements Runnable {
 			return;
 		}
 		
-		String errorMessage = null;
-		boolean errorsOccurred = false;
-		int resultCount = 0;
-		int queryNumber = 1;
-		int percentCompletePerQuery = 100/pendingQueries.size();
+		int queriesProcessed = 0;
 		for(FactivaQuery query : pendingQueries) {
-			errorsOccurred = false;
 			this.progressToken.setStatusMessage("Processing query '" + query.getId() + "'...");
 			
 			// get to search page
 			try {
 				handler.goToSearchPage();
 			} catch (Exception e) {
-				errorsOccurred = true;
-				this.progressToken.setStatusMessage("Error occurred trying to get to search page: " + e.getMessage());
-				errorMessage = "error: " + e.getMessage();
+				reportExceptionToUi("Error occurred trying to get to search page for query: '" + query.getId() + "'", 0, e);
+				return;
 			}
 			
 			// where the magic BEGINS
-			if(!errorsOccurred) {
-				try {
-					resultCount = handler.executeQuery(query);
-				} catch (FactivaExtractorFatalException fex) {
-					errorsOccurred = true;
-					this.progressToken.setStatusMessage("FATAL error occurred during search: " + fex.getMessage());
-					errorMessage = "error: " + fex.getMessage();
-				} catch (Exception e) {
-					errorsOccurred = true;
-					this.progressToken.setStatusMessage("Error occurred during search: " + e.getMessage());
-					errorMessage = "error: " + e.getMessage();
-				}
-			}
-			
-			// increment progress complete percentage
-			this.progressToken.setPercentComplete(percentCompletePerQuery * queryNumber);
-			
-//			spreadsheet.setProcessedFlag(queryNumber);
-			if(!errorsOccurred) {
+			try {
+				int resultCount = handler.executeQuery(query);
+				progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), true, resultCount, "");
 				this.progressToken.setStatusMessage("Query '" + query.getId() + "' processed successfully!");
-//				spreadsheet.setCommentForQuery(queryNumber, "results: " + resultCount);
-			} else {
-//				spreadsheet.setCommentForQuery(queryNumber, errorMessage);
+				this.progressToken.setPercentComplete((++queriesProcessed * 100) / pendingQueries.size());
+			} catch (FactivaExtractorFatalException fex) {
+				String errorMessage = "FATAL error occurred during search: " + fex.getMessage();
+				try {
+					progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), false, 0, errorMessage);
+				} catch (Exception e1) {
+					reportExceptionToUi("Failed to write to progress cache!  Exiting...", 0, e1);
+					return;
+				}
+				MessageHandler.logMessage(errorMessage);
+			} catch (Exception e) {
+				String errorMessage = "Error occurred during search: " + e.getMessage();
+				try {
+					progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), false, 0, errorMessage);
+				} catch (Exception e1) {
+					reportExceptionToUi("Failed to write to progress cache!  Exiting...", 0, e1);
+					return;
+				}
+				MessageHandler.logMessage(errorMessage);
 			}
-			// TODO: should be appending to a progress file, so that we don't write to the Excel file OVER
-			// and OVER again...  especially if it's huge.  Just append to a text file, which is cheap, and at the
-			// end of processing, read it in, update the spreadsheet, and be done!
-			
-			queryNumber++;
 		}
 		
-		// log out
-		this.progressToken.setStatusMessage("Attempting to log out...");
+		// write progress cache data to Excel file
+		MessageHandler.logMessage("Writing progress cache to Excel file...");
 		try {
-			handler.logout();
-		} catch (Throwable t) {
-			this.progressToken.setStatusMessage("Error occurred when attempting to log out: " + t.getMessage());
+			progressCache.writeCachedEntriesToSpreadsheet(spreadsheet);
+		} catch (Exception e) {
+			reportExceptionToUi("Failed to write to progress cache to Excel file, cache may be corrupted.  Exiting...", 0, e);
+			return;
 		}
+		try {
+			spreadsheet.saveWorkbook();
+		} catch (Exception e) {
+			// TODO: add 'Recover Results' button in the UI
+			reportExceptionToUi("Failed to save updated Excel file.  Fortunately, this is recoverable via the 'Recover Results' button in the UI", 0, e);
+			return;
+		}
+		// attempt to delete cache
+		try {
+			progressCache.deleteCache();
+		} catch (Exception e) {
+			MessageHandler.logMessage("Failed to delete cache file, may need to be deleted manually");
+		}
+		
+		// close window
+		// TODO: should this occur any time we run into errors?
+		this.progressToken.setStatusMessage("Closing Factiva...");
+		handler.closeWebWindow();
+		
 		this.progressToken.setStatusMessage("Finished");
 	}
 	

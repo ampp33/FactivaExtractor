@@ -286,6 +286,7 @@ public class FactivaExtractorUi {
 				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
 				config.setUsername(username);
 				config.setPassword(password);
+				config.setWorkingDirPath(workingDir.getAbsolutePath());
 				config.setSpreadsheetFilePath(spreadsheetFilePath);
 				config.setTempDownloadDirPath(tempDownloadDirPath);
 				config.setDestinationDirPath(outputDirectoryPath);

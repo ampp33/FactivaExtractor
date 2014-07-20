@@ -5,6 +5,7 @@ import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
 public class FactivaWebHandlerConfig {
 	private String username = null;
 	private String password = null;
+	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
 	private String tempDownloadDirPath = null;
 	private String destinationDirPath = null;
@@ -22,6 +23,12 @@ public class FactivaWebHandlerConfig {
 	}
 	public void setPassword(String password) {
 		this.password = password;
+	}
+	public String getWorkingDirPath() {
+		return workingDirPath;
+	}
+	public void setWorkingDirPath(String workingDirPath) {
+		this.workingDirPath = workingDirPath;
 	}
 	public String getSpreadsheetFilePath() {
 		return spreadsheetFilePath;

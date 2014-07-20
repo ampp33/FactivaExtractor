@@ -3,6 +3,7 @@ package org.malibu.msu.factiva.extractor.ss;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
@@ -37,13 +38,16 @@ public class FactivaQuerySpreadsheetProcessor {
 	private static final int END_DATE_COLUMN_INDEX = 5;
 	
 	private Workbook workbook = null;
+	private String filePath = null;
 	
-	private static final String COMMENT_COLUMN_TITLE = "COMMENT";
 	private static final String PROCESSED_COLUMN_TITLE = "PROCESSED";
+	private static final String RESULT_COUNT_COLUMN_TITLE = "RESULT_COUNT";
+	private static final String COMMENT_COLUMN_TITLE = "COMMENT";
 	
-	private boolean generatedColumnsCreated = false;
-	private int commentColumnIndex = -1;
+	private boolean processingColumnsCreated = false;
 	private int processesedColumnIndex = -1;
+	private int resultCountColumnIndex = -1;
+	private int commentColumnIndex = -1;
 	
 	/**
 	 * Constructor that accepts a file path, and verifies the spreadsheet before
@@ -60,62 +64,71 @@ public class FactivaQuerySpreadsheetProcessor {
 		validateWorkbook(workbook);
 	}
 	
-	public void setCommentForQuery(int queryRow, String comment) {
-		if(queryRow > -1 && comment != null) {
-			if(!generatedColumnsCreated) {
-				setupCommentAndProcessedColumns();
-			}
-			Sheet sheet = workbook.getSheet(SHEET_NAME);
-			Row row = sheet.getRow(queryRow);
-			Cell commentCell = row.getCell(this.commentColumnIndex);
-			if(commentCell == null) {
-				commentCell = row.createCell(this.commentColumnIndex);
-			}
-			commentCell.setCellValue(comment);
-		}
-	}
-	
 	public void setProcessedFlag(int queryRow) {
-		if(queryRow > -1) {
-			if(!generatedColumnsCreated) {
-				setupCommentAndProcessedColumns();
-			}
-			Sheet sheet = workbook.getSheet(SHEET_NAME);
-			Row row = sheet.getRow(queryRow);
-			Cell processedFlagCell = row.getCell(this.processesedColumnIndex);
-			if(processedFlagCell == null) {
-				processedFlagCell = row.createCell(this.processesedColumnIndex);
-			}
-			processedFlagCell.setCellValue("X");
+		setupProcessingColumns();
+		setCellValue(queryRow, this.processesedColumnIndex, "X");
+	}
+	
+	public void setResultCount(int queryRow, int resultCount) {
+		setupProcessingColumns();
+		setCellValue(queryRow, this.resultCountColumnIndex, String.valueOf(resultCount));
+	}
+	
+	public void setCommentForQuery(int queryRow, String comment) {
+		if(comment != null) {
+			setupProcessingColumns();
+			setCellValue(queryRow, this.commentColumnIndex, comment);
 		}
 	}
 	
-	private void setupCommentAndProcessedColumns() {
-		if(!generatedColumnsCreated) {
+	private void setupProcessingColumns() {
+		if(!processingColumnsCreated) {
 			int lastColumnIndex = 0;
+			// check if sheet already has processing columns setup
 			Sheet sheet = workbook.getSheet(SHEET_NAME);
-			for(int rowIndex = 1; rowIndex <= sheet.getLastRowNum(); rowIndex++) {
-				if(sheet.getRow(rowIndex).getLastCellNum() > lastColumnIndex) {
-					lastColumnIndex = sheet.getRow(rowIndex).getLastCellNum();
+			Row headerRow = sheet.getRow(0);
+			for(int i = 0; i < headerRow.getLastCellNum(); i++) {
+				Cell headerCell = headerRow.getCell(i);
+				String header = getCellValueAsString(this.evaluator, headerCell);
+				if(header != null) {
+					lastColumnIndex = i;
+					header = header.trim();
+					if(PROCESSED_COLUMN_TITLE.equals(header)) {
+						this.processesedColumnIndex = i;
+					} else if (RESULT_COUNT_COLUMN_TITLE.equals(header)) {
+						this.resultCountColumnIndex = i;
+					} else if (COMMENT_COLUMN_TITLE.equals(header)) {
+						this.commentColumnIndex = i;
+					}
 				}
 			}
-			this.processesedColumnIndex = lastColumnIndex;
-			this.commentColumnIndex = lastColumnIndex + 1;
 			
+			// add processed and comment comment columns, if necessary
 			CellStyle boldCellStyle = this.workbook.createCellStyle();
 			Font font = this.workbook.createFont();
 			font.setBoldweight(Font.BOLDWEIGHT_BOLD);
 			boldCellStyle.setFont(font);
 			
-			Row headerRow = sheet.getRow(0);
-			Cell cell = headerRow.createCell(this.processesedColumnIndex);
-			cell.setCellValue(PROCESSED_COLUMN_TITLE);
-			cell.setCellStyle(boldCellStyle);
-			cell = headerRow.createCell(this.commentColumnIndex);
-			cell.setCellValue(COMMENT_COLUMN_TITLE);
-			cell.setCellStyle(boldCellStyle);
+			if(this.processesedColumnIndex == -1) {
+				this.processesedColumnIndex = ++lastColumnIndex;
+				Cell cell = headerRow.createCell(this.processesedColumnIndex);
+				cell.setCellValue(PROCESSED_COLUMN_TITLE);
+				cell.setCellStyle(boldCellStyle);
+			}
+			if(this.resultCountColumnIndex == -1) {
+				this.resultCountColumnIndex = ++lastColumnIndex;
+				Cell cell = headerRow.createCell(this.resultCountColumnIndex);
+				cell.setCellValue(RESULT_COUNT_COLUMN_TITLE);
+				cell.setCellStyle(boldCellStyle);
+			}
+			if(this.commentColumnIndex == -1) {
+				this.commentColumnIndex = ++lastColumnIndex;
+				Cell cell = headerRow.createCell(this.commentColumnIndex);
+				cell.setCellValue(COMMENT_COLUMN_TITLE);
+				cell.setCellStyle(boldCellStyle);
+			}
 			
-			generatedColumnsCreated = true;
+			processingColumnsCreated = true;
 		}
 	}
 	
@@ -311,6 +324,7 @@ public class FactivaQuerySpreadsheetProcessor {
 		if(!(filePath.toLowerCase().endsWith(".xlsx") || filePath.toLowerCase().endsWith(".xls"))) {
 			throw new IOException("spreadsheet file doesn't have a valid Excel extension (ex: .xls or .xlsx)");
 		}
+		this.filePath = spreadsheetFile.getAbsolutePath();
 		
 		// load workbook
 		try {
@@ -320,6 +334,53 @@ public class FactivaQuerySpreadsheetProcessor {
 			return workbook;
 		} catch (Throwable t) {
 			throw new IOException("failed to load spreadsheet", t);
+		}
+	}
+	
+	public void saveWorkbook() throws IOException {
+		File newFile = new File(this.filePath);
+		File backedUpFile = new File(this.filePath + ".bak");
+		// create new File objects, just in case renaming causing issues
+		if(!new File(this.filePath).renameTo(new File(this.filePath + ".bak"))) {
+			// rename failed
+			throw new IOException("failed to backup input spreadsheet, is the speadsheet in use?");
+		}
+		// backup spreadsheet first
+		FileOutputStream fos = null;
+		try {
+			fos = new FileOutputStream(new File(this.filePath));
+			workbook.write(fos);
+		} finally {
+			// close output stream, if we can
+			if(fos != null) {
+				try { fos.close(); } catch (Exception e) {}
+			}
+			// attempt to delete the new file we were creating
+			if(!newFile.delete()) {
+				throw new IOException("save failed, but a backup still exists of the original spreadsheet at: " + backedUpFile.getAbsolutePath());
+			}
+			// attempt to rename backup to original file name
+			if(!backedUpFile.renameTo(newFile)) {
+				throw new IOException("failed to rename backed up spreadsheet to original file name, but a backup still exists of the original spreadsheet at: " + backedUpFile.getAbsolutePath());
+			}
+		}
+		
+		// remove backup spreadsheet, since we've successfully saved
+		backedUpFile.delete();
+	}
+	
+	private void setCellValue(int rowIndex, int columnIndex, String value) {
+		if(rowIndex > -1) {
+			Sheet sheet = workbook.getSheet(SHEET_NAME);
+			Row row = sheet.getRow(rowIndex);
+			if(row == null) {
+				row = sheet.createRow(rowIndex);
+			}
+			Cell cell = row.getCell(columnIndex);
+			if(cell == null) {
+				cell = row.createCell(columnIndex);
+			}
+			cell.setCellValue(value);
 		}
 	}
 	

@@ -2,6 +2,7 @@ package org.malibu.msu.factiva.extractor;
 
 import java.io.IOException;
 import java.util.List;
+import java.util.Random;
 
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
@@ -10,6 +11,7 @@ import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQueryProgressCache;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
+import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandler;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
 
@@ -38,6 +40,12 @@ public class FactivaExtractorThread implements Runnable {
 
 	@Override
 	public void run() {
+		boolean enablePausing = Boolean.parseBoolean(Constants.getInstance().getConstant(Constants.ENABLE_PAUSING));
+		int maxSecondsToPause = 0;
+		try {
+			maxSecondsToPause = Integer.parseInt(Constants.getInstance().getConstant(Constants.MAX_SECONDS_TO_PAUSE));
+		} catch (Exception e) {}
+		
 		FactivaQuerySpreadsheetProcessor spreadsheet = null;
 		FactivaQueryProgressCache progressCache = null;
 		List<FactivaQuery> pendingQueries = null;
@@ -107,6 +115,14 @@ public class FactivaExtractorThread implements Runnable {
 				}
 				MessageHandler.logMessage(errorMessage);
 			}
+			
+			// see if we want to pause in between queries, to act more "human"
+			if(enablePausing) {
+				// pick a time to sleep, between 0 and MAX_SECONDS_TO_PAUSE seconds
+				int pauseTime = new Random().nextInt(maxSecondsToPause + 1);
+				// sleep
+				try { Thread.sleep(pauseTime * 1000); } catch (InterruptedException e) {}
+			}
 		}
 		
 		// write progress cache data to Excel file
@@ -120,8 +136,8 @@ public class FactivaExtractorThread implements Runnable {
 		try {
 			spreadsheet.saveWorkbook();
 		} catch (Exception e) {
-			// TODO: add 'Recover Results' button in the UI
-			reportExceptionToUi("Failed to save updated Excel file.  Fortunately, this is recoverable via the 'Recover Results' button in the UI", 0, e);
+			// TODO: add 'Recover From Cache' button in the UI
+			reportExceptionToUi("Failed to save updated Excel file.  Fortunately, this is recoverable via the 'Update Spreadsheet from Cache' button in the UI", 0, e);
 			return;
 		}
 		// attempt to delete cache

@@ -34,6 +34,7 @@ import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
 import org.malibu.msu.factiva.extractor.FactivaKeywordValidatorThread;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
+import org.malibu.msu.factiva.extractor.ss.FactivaQueryProgressCache;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
@@ -408,6 +409,61 @@ public class FactivaExtractorUi {
 		textField.setBounds(106, 336, 217, 22);
 		panel.add(textField);
 		textField.setColumns(10);
+		
+		JButton btnUpdateSpreadsheetFrom = new JButton("Update Spreadsheet from Cache");
+		btnUpdateSpreadsheetFrom.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				if(!verifyAll()) {
+					return;
+				}
+				
+				File workingDir = new File(lblDirectory.getText());
+				File[] filesInWorkingDir = workingDir.listFiles(new FilenameFilter() {
+					@Override
+					public boolean accept(File file, String fileName) {
+						return fileName != null && (fileName.toLowerCase().endsWith(".xls") || fileName.toLowerCase().endsWith(".xlsx"));
+					}
+				});
+				String spreadsheetFilePath = filesInWorkingDir[0].getAbsolutePath();
+				
+				// load cache and spreadsheet
+				FactivaQuerySpreadsheetProcessor spreadsheet = null;
+				FactivaQueryProgressCache progressCache = null;
+				try {
+					progressCache = new FactivaQueryProgressCache(workingDir.getAbsolutePath());
+					progressCache.close(); // we don't want to write to it, just read
+					spreadsheet = new FactivaQuerySpreadsheetProcessor(spreadsheetFilePath);
+				} catch (IOException | FactivaSpreadsheetException e) {
+					MessageHandler.handleException("Failed to load input spreadsheet and cache", e);
+					return;
+				}
+				
+				// write progress cache data to Excel file
+				MessageHandler.logMessage("Writing progress cache to Excel file...");
+				try {
+					progressCache.writeCachedEntriesToSpreadsheet(spreadsheet);
+				} catch (Exception e) {
+					MessageHandler.handleException("Failed to write to progress cache to Excel file, cache may be corrupted.  Exiting...", e);
+					return;
+				}
+				try {
+					spreadsheet.saveWorkbook();
+				} catch (Exception e) {
+					MessageHandler.handleException("Failed to save updated Excel file", e);
+					return;
+				}
+				// attempt to delete cache
+				MessageHandler.logMessage("Deleting cache...");
+				try {
+					progressCache.deleteCache();
+				} catch (Exception e) {
+					MessageHandler.logMessage("Failed to delete cache file, may need to be deleted manually");
+				}
+				MessageHandler.logMessage("Finished updating spreadsheet from cache");
+			}
+		});
+		btnUpdateSpreadsheetFrom.setBounds(124, 387, 260, 25);
+		panel.add(btnUpdateSpreadsheetFrom);
 	}
 	
 	private boolean verifyWorkingDirectory() {

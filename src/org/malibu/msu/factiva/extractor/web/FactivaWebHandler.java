@@ -72,8 +72,11 @@ public class FactivaWebHandler {
 		this.tempDownloadsDirectory = tempDownloadsDirectory;
 		this.downloadDestinationDirectory = downloadDestinationDirectory;
 		
-		// update downlod dir in firefox profile
+		// update download dir in firefox profile
 		updateFirefoxFileDownloadProperties(this.profile, tempDownloadsDirectory);
+		
+		// recreate driver with new firefox settings
+		this.driver = new FirefoxDriver(this.profile);
 	}
 	
 	public void getToFactivaLoginPage() throws FactivaExtractorWebHandlerException {

@@ -340,28 +340,31 @@ public class FactivaQuerySpreadsheetProcessor {
 	public void saveWorkbook() throws IOException {
 		File newFile = new File(this.filePath);
 		File backedUpFile = new File(this.filePath + ".bak");
+		// backup spreadsheet first
 		// create new File objects, just in case renaming causing issues
 		if(!new File(this.filePath).renameTo(new File(this.filePath + ".bak"))) {
 			// rename failed
 			throw new IOException("failed to backup input spreadsheet, is the speadsheet in use?");
 		}
-		// backup spreadsheet first
+		
 		FileOutputStream fos = null;
 		try {
 			fos = new FileOutputStream(new File(this.filePath));
 			workbook.write(fos);
-		} finally {
-			// close output stream, if we can
-			if(fos != null) {
-				try { fos.close(); } catch (Exception e) {}
-			}
+		} catch (IOException e) {
 			// attempt to delete the new file we were creating
 			if(!newFile.delete()) {
 				throw new IOException("save failed, but a backup still exists of the original spreadsheet at: " + backedUpFile.getAbsolutePath());
 			}
 			// attempt to rename backup to original file name
 			if(!backedUpFile.renameTo(newFile)) {
-				throw new IOException("failed to rename backed up spreadsheet to original file name, but a backup still exists of the original spreadsheet at: " + backedUpFile.getAbsolutePath());
+				throw new IOException("failed to rename backed up spreadsheet to original file name");
+			}
+			throw e;
+		} finally {
+			// close output stream, if we can
+			if(fos != null) {
+				try { fos.close(); } catch (Exception e) {}
 			}
 		}
 		
@@ -370,7 +373,7 @@ public class FactivaQuerySpreadsheetProcessor {
 	}
 	
 	private void setCellValue(int rowIndex, int columnIndex, String value) {
-		if(rowIndex > -1) {
+		if(rowIndex > -1 && columnIndex > -1) {
 			Sheet sheet = workbook.getSheet(SHEET_NAME);
 			Row row = sheet.getRow(rowIndex);
 			if(row == null) {

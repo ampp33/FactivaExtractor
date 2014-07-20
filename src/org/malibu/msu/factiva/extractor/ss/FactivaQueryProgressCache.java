@@ -63,7 +63,9 @@ public class FactivaQueryProgressCache {
 				String comment = entry[4];
 				if(isProcessed) {
 					spreadsheet.setProcessedFlag(queryLineNo);
-					spreadsheet.setResultCount(queryLineNo, resultCount);
+					if(resultCount >= 0) {
+						spreadsheet.setResultCount(queryLineNo, resultCount);
+					}
 				}
 				spreadsheet.setCommentForQuery(queryLineNo, comment);
 			}
@@ -85,7 +87,7 @@ public class FactivaQueryProgressCache {
 			result[i] = line.substring(0, index);
 			line = line.substring(index + 1);
 		}
-		result[3] = line;
+		result[4] = line;
 		
 		return result;
 	}

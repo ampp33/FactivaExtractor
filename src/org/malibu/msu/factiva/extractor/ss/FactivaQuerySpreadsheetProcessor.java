@@ -40,14 +40,10 @@ public class FactivaQuerySpreadsheetProcessor {
 	private Workbook workbook = null;
 	private String filePath = null;
 	
-	private static final String PROCESSED_COLUMN_TITLE = "PROCESSED";
-	private static final String RESULT_COUNT_COLUMN_TITLE = "RESULT_COUNT";
-	private static final String COMMENT_COLUMN_TITLE = "COMMENT";
-	
-	private boolean processingColumnsCreated = false;
-	private int processesedColumnIndex = -1;
-	private int resultCountColumnIndex = -1;
-	private int commentColumnIndex = -1;
+	private static final String[] PROCESSING_COLUMNS = new String[] {"PROCESSED","RESULT_COUNT","COMMENT"};
+	private static final int PROCESSED_COLUMN_INDEX = 6;
+	private static final int RESULT_COUNT_COLUMN_INDEX = 7;
+	private static final int COMMENT_COLUMN_INDEX = 8;
 	
 	/**
 	 * Constructor that accepts a file path, and verifies the spreadsheet before
@@ -62,73 +58,20 @@ public class FactivaQuerySpreadsheetProcessor {
 		this.workbook = validateAndLoadWorkbook(filePath);
 		this.evaluator = workbook.getCreationHelper().createFormulaEvaluator();
 		validateWorkbook(workbook);
+		setupProcessingColumns();
 	}
 	
 	public void setProcessedFlag(int queryRow) {
-		setupProcessingColumns();
-		setCellValue(queryRow, this.processesedColumnIndex, "X");
+		setCellValue(queryRow, PROCESSED_COLUMN_INDEX, "X");
 	}
 	
 	public void setResultCount(int queryRow, int resultCount) {
-		setupProcessingColumns();
-		setCellValue(queryRow, this.resultCountColumnIndex, String.valueOf(resultCount));
+		setCellValue(queryRow, RESULT_COUNT_COLUMN_INDEX, String.valueOf(resultCount));
 	}
 	
 	public void setCommentForQuery(int queryRow, String comment) {
 		if(comment != null) {
-			setupProcessingColumns();
-			setCellValue(queryRow, this.commentColumnIndex, comment);
-		}
-	}
-	
-	private void setupProcessingColumns() {
-		if(!processingColumnsCreated) {
-			int lastColumnIndex = 0;
-			// check if sheet already has processing columns setup
-			Sheet sheet = workbook.getSheet(SHEET_NAME);
-			Row headerRow = sheet.getRow(0);
-			for(int i = 0; i < headerRow.getLastCellNum(); i++) {
-				Cell headerCell = headerRow.getCell(i);
-				String header = getCellValueAsString(this.evaluator, headerCell);
-				if(header != null) {
-					lastColumnIndex = i;
-					header = header.trim();
-					if(PROCESSED_COLUMN_TITLE.equals(header)) {
-						this.processesedColumnIndex = i;
-					} else if (RESULT_COUNT_COLUMN_TITLE.equals(header)) {
-						this.resultCountColumnIndex = i;
-					} else if (COMMENT_COLUMN_TITLE.equals(header)) {
-						this.commentColumnIndex = i;
-					}
-				}
-			}
-			
-			// add processed and comment comment columns, if necessary
-			CellStyle boldCellStyle = this.workbook.createCellStyle();
-			Font font = this.workbook.createFont();
-			font.setBoldweight(Font.BOLDWEIGHT_BOLD);
-			boldCellStyle.setFont(font);
-			
-			if(this.processesedColumnIndex == -1) {
-				this.processesedColumnIndex = ++lastColumnIndex;
-				Cell cell = headerRow.createCell(this.processesedColumnIndex);
-				cell.setCellValue(PROCESSED_COLUMN_TITLE);
-				cell.setCellStyle(boldCellStyle);
-			}
-			if(this.resultCountColumnIndex == -1) {
-				this.resultCountColumnIndex = ++lastColumnIndex;
-				Cell cell = headerRow.createCell(this.resultCountColumnIndex);
-				cell.setCellValue(RESULT_COUNT_COLUMN_TITLE);
-				cell.setCellStyle(boldCellStyle);
-			}
-			if(this.commentColumnIndex == -1) {
-				this.commentColumnIndex = ++lastColumnIndex;
-				Cell cell = headerRow.createCell(this.commentColumnIndex);
-				cell.setCellValue(COMMENT_COLUMN_TITLE);
-				cell.setCellStyle(boldCellStyle);
-			}
-			
-			processingColumnsCreated = true;
+			setCellValue(queryRow, COMMENT_COLUMN_INDEX, comment);
 		}
 	}
 	
@@ -174,7 +117,7 @@ public class FactivaQuerySpreadsheetProcessor {
 				currentQuery.setSubjects(new ArrayList<String>());
 				queries.add(currentQuery);
 				currentQuery.setId(id);
-				currentQuery.setQueryRowNumber(rowIndex + 1);
+				currentQuery.setQueryRowNumber(rowIndex);
 			}
 			if(currentQuery == null) {
 				throw new FactivaSpreadsheetException("query at spreadsheet row " + rowIndex + " doesn't have an ID, which is required");
@@ -199,6 +142,9 @@ public class FactivaQuerySpreadsheetProcessor {
 			if(endDate != null) {
 				currentQuery.setDateRangeTo(endDate);
 			}
+			String isProcessedString = getCellValueAsString(evaluator, currentRow.getCell(PROCESSED_COLUMN_INDEX));
+			boolean isProcessed = isProcessedString == null ? false : "X".equals(isProcessedString);
+			currentQuery.setProcessed(isProcessed);
 		}
 		
 		return queries;
@@ -335,6 +281,7 @@ public class FactivaQuerySpreadsheetProcessor {
 		} catch (Throwable t) {
 			throw new IOException("failed to load spreadsheet", t);
 		}
+		
 	}
 	
 	public void saveWorkbook() throws IOException {
@@ -370,6 +317,29 @@ public class FactivaQuerySpreadsheetProcessor {
 		
 		// remove backup spreadsheet, since we've successfully saved
 		backedUpFile.delete();
+	}
+	
+	private void setupProcessingColumns() {
+		Sheet sheet = workbook.getSheet(SHEET_NAME);
+		Row headerRow = sheet.getRow(0);
+		
+		// add processed and comment comment columns
+		CellStyle boldCellStyle = this.workbook.createCellStyle();
+		Font font = this.workbook.createFont();
+		font.setBoldweight(Font.BOLDWEIGHT_BOLD);
+		boldCellStyle.setFont(font);
+		
+		Cell cell = headerRow.getCell(PROCESSED_COLUMN_INDEX) == null ? headerRow.createCell(PROCESSED_COLUMN_INDEX) : headerRow.getCell(PROCESSED_COLUMN_INDEX);
+		cell.setCellValue(PROCESSING_COLUMNS[0]);
+		cell.setCellStyle(boldCellStyle);
+		
+		cell = headerRow.getCell(RESULT_COUNT_COLUMN_INDEX) == null ? headerRow.createCell(RESULT_COUNT_COLUMN_INDEX) : headerRow.getCell(RESULT_COUNT_COLUMN_INDEX);
+		cell.setCellValue(PROCESSING_COLUMNS[1]);
+		cell.setCellStyle(boldCellStyle);
+		
+		cell = headerRow.getCell(COMMENT_COLUMN_INDEX) == null ? headerRow.createCell(COMMENT_COLUMN_INDEX) : headerRow.getCell(COMMENT_COLUMN_INDEX);
+		cell.setCellValue(PROCESSING_COLUMNS[2]);
+		cell.setCellStyle(boldCellStyle);
 	}
 	
 	private void setCellValue(int rowIndex, int columnIndex, String value) {

@@ -1,9 +1,13 @@
 package org.malibu.msu.factiva.extractor;
 
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 import java.util.Random;
 
+import org.malibu.mail.Email;
+import org.malibu.mail.EmailException;
+import org.malibu.mail.EmailSender;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
@@ -19,6 +23,7 @@ public class FactivaExtractorThread implements Runnable {
 	
 	private String username = null;
 	private String password = null;
+	private String alertEmailAddress = null;
 	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
 	private String tempDownloadDirPath = null;
@@ -30,6 +35,7 @@ public class FactivaExtractorThread implements Runnable {
 	public FactivaExtractorThread(FactivaWebHandlerConfig config) {
 		this.username = config.getUsername();
 		this.password = config.getPassword();
+		this.alertEmailAddress = config.getAlertEmailAddress();
 		this.workingDirPath = config.getWorkingDirPath();
 		this.spreadsheetFilePath = config.getSpreadsheetFilePath();
 		this.tempDownloadDirPath = config.getTempDownloadDirPath();
@@ -45,6 +51,9 @@ public class FactivaExtractorThread implements Runnable {
 		try {
 			maxSecondsToPause = Integer.parseInt(Constants.getInstance().getConstant(Constants.MAX_SECONDS_TO_PAUSE));
 		} catch (Exception e) {}
+		if(enablePausing) {
+			MessageHandler.logMessage("Pausing enabled");
+		}
 		
 		FactivaQuerySpreadsheetProcessor spreadsheet = null;
 		FactivaQueryProgressCache progressCache = null;
@@ -80,6 +89,11 @@ public class FactivaExtractorThread implements Runnable {
 		
 		int queriesProcessed = 0;
 		for(FactivaQuery query : pendingQueries) {
+			// skip already processed queries
+			if(query.isProcessed()) {
+				continue;
+			}
+			
 			this.progressToken.setStatusMessage("Processing query '" + query.getId() + "'...");
 			
 			// get to search page
@@ -120,6 +134,7 @@ public class FactivaExtractorThread implements Runnable {
 			if(enablePausing) {
 				// pick a time to sleep, between 0 and MAX_SECONDS_TO_PAUSE seconds
 				int pauseTime = new Random().nextInt(maxSecondsToPause + 1);
+				MessageHandler.logMessage("Pausing for '" + pauseTime + "' seconds...");
 				// sleep
 				try { Thread.sleep(pauseTime * 1000); } catch (InterruptedException e) {}
 			}
@@ -152,13 +167,43 @@ public class FactivaExtractorThread implements Runnable {
 		this.progressToken.setStatusMessage("Closing Factiva...");
 		handler.closeWebWindow();
 		
+		// attempt to send completion email
+		if(this.alertEmailAddress != null) {
+			try {
+				sendEmail("FactivaExtractor Processing COMPLETE", "Processing completed at: " + new Date());
+			} catch (Exception e) {
+				MessageHandler.logMessage("Failed to send error email!  Exception message: " + e.getMessage());
+			}
+		}
+		
 		this.progressToken.setStatusMessage("Finished");
 	}
 	
 	private void reportExceptionToUi(String message, int percentComplete, Exception e) {
+		if(this.alertEmailAddress != null) {
+			// if an error email was specified, send an error email!
+			StringBuilder buffer = new StringBuilder();
+			buffer.append("An error occurred during FactivaExtractor processing at ");
+			buffer.append(new Date());
+			buffer.append(", with error message: " + message + ".  ");
+			buffer.append("Processing has most likely halted, please review and restart processing");
+			try {
+				sendEmail("FactivaExtractor ERROR Notice", buffer.toString());
+			} catch (Exception ee) {
+				MessageHandler.logMessage("Failed to send error email!  Exception message: " + ee.getMessage());
+			}
+		}
 		this.progressToken.setErrorOccurred(true);
 		this.progressToken.setPercentComplete(0);
 		this.progressToken.setStatusMessage(message);
 		MessageHandler.handleException(message, e);
+	}
+	
+	private void sendEmail(String subject, String message) throws EmailException {
+		Email email = new Email();
+		email.setToAddress(this.alertEmailAddress);
+		email.setSubject(subject);
+		email.setMessage(message);
+		EmailSender.sendEmail(email);
 	}
 }

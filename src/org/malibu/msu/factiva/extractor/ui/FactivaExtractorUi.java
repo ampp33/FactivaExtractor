@@ -10,6 +10,7 @@ import java.awt.image.BufferedImage;
 import java.io.File;
 import java.io.FilenameFilter;
 import java.io.IOException;
+import java.util.Date;
 import java.util.List;
 
 import javax.imageio.ImageIO;
@@ -28,6 +29,8 @@ import javax.swing.ScrollPaneConstants;
 import javax.swing.UIManager;
 import javax.swing.text.DefaultCaret;
 
+import org.malibu.mail.Email;
+import org.malibu.mail.EmailSender;
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressListener;
 import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
 import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
@@ -284,9 +287,14 @@ public class FactivaExtractorUi {
 					}
 				});
 				
+				String alertEmailAddress = textField.getText();
+				
 				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
 				config.setUsername(username);
 				config.setPassword(password);
+				if(alertEmailAddress != null && alertEmailAddress.trim().length() != 0) {
+					config.setAlertEmailAddress(alertEmailAddress);
+				}
 				config.setWorkingDirPath(workingDir.getAbsolutePath());
 				config.setSpreadsheetFilePath(spreadsheetFilePath);
 				config.setTempDownloadDirPath(tempDownloadDirPath);
@@ -396,9 +404,9 @@ public class FactivaExtractorUi {
 		btnValidate_1.setBounds(10, 283, 97, 25);
 		panel.add(btnValidate_1);
 		
-		JLabel lblStepoptional_1 = new JLabel("Step 5 (optional): Specify an email address to email an alert if this monitor runs into errors");
+		JLabel lblStepoptional_1 = new JLabel("Step 5 (optional): Specify an email address to contact if processing has errors or completes");
 		lblStepoptional_1.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepoptional_1.setBounds(10, 316, 604, 16);
+		lblStepoptional_1.setBounds(10, 316, 620, 16);
 		panel.add(lblStepoptional_1);
 		
 		JLabel lblEmailAddress = new JLabel("Email address:");
@@ -406,7 +414,7 @@ public class FactivaExtractorUi {
 		panel.add(lblEmailAddress);
 		
 		textField = new JTextField();
-		textField.setBounds(106, 336, 217, 22);
+		textField.setBounds(106, 336, 146, 22);
 		panel.add(textField);
 		textField.setColumns(10);
 		
@@ -464,6 +472,28 @@ public class FactivaExtractorUi {
 		});
 		btnUpdateSpreadsheetFrom.setBounds(124, 387, 260, 25);
 		panel.add(btnUpdateSpreadsheetFrom);
+		
+		JButton btnSendTestEmail = new JButton("Send Test Email");
+		btnSendTestEmail.addActionListener(new ActionListener() {
+			public void actionPerformed(ActionEvent arg0) {
+				String alertEmailAddress = textField.getText();
+				if(alertEmailAddress != null && alertEmailAddress.trim().length() != 0) {
+					MessageHandler.logMessage("Sending test email to: " + alertEmailAddress);
+					Email email = new Email();
+					email.setToAddress(alertEmailAddress);
+					email.setSubject("FactivaExtractor TEST Email");
+					email.setMessage("Test verification message sent at: " + new Date());
+					MessageHandler.logMessage("email message successfully sent");
+					try {
+						EmailSender.sendEmail(email);
+					} catch (Exception e) {
+						MessageHandler.handleException("Failed to send test email", e);
+					}
+				}
+			}
+		});
+		btnSendTestEmail.setBounds(260, 335, 158, 25);
+		panel.add(btnSendTestEmail);
 	}
 	
 	private boolean verifyWorkingDirectory() {

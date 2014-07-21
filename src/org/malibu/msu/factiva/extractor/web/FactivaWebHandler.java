@@ -15,6 +15,7 @@ import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
+import org.malibu.msu.factiva.extractor.ui.MessageHandler;
 import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.openqa.selenium.By;
@@ -41,6 +42,10 @@ public class FactivaWebHandler {
 	private String downloadDestinationDirectory = null;
 	
 	public FactivaWebHandler(String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
+		this(firefoxProfileDirectory, false);
+	}
+	
+	public FactivaWebHandler(String firefoxProfileDirectory, boolean initializeDriver) throws FactivaExtractorWebHandlerException {
 		File firefoxProfileDir = new File(firefoxProfileDirectory);
 		if(!firefoxProfileDir.exists() || !firefoxProfileDir.isDirectory()) {
 			throw new FactivaExtractorWebHandlerException("invalid firefox profile directory specified: '" + firefoxProfileDir + "'");
@@ -51,11 +56,14 @@ public class FactivaWebHandler {
 		FirefoxProfile profile = new FirefoxProfile(firefoxProfileFolder);
 		
 		this.profile = profile;
-		this.driver = new FirefoxDriver(profile);
+		
+		if(initializeDriver) {
+			this.driver = new FirefoxDriver(profile);
+		}
 	}
 	
 	public FactivaWebHandler(String tempDownloadsDirectory, String downloadDestinationDirectory, String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
-		this(firefoxProfileDirectory);
+		this(firefoxProfileDirectory, false);
 		
 		// verify supplied directories exist
 		File tempDownloadDir = new File(tempDownloadsDirectory);
@@ -75,7 +83,7 @@ public class FactivaWebHandler {
 		// update download dir in firefox profile
 		updateFirefoxFileDownloadProperties(this.profile, tempDownloadsDirectory);
 		
-		// recreate driver with new firefox settings
+		// create driver with new firefox settings
 		this.driver = new FirefoxDriver(this.profile);
 	}
 	
@@ -232,7 +240,7 @@ public class FactivaWebHandler {
 		
 		// attempt to determine number of articles found
 		try {
-			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']/text()"));
+			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']"));
 			String headlineCountText = headlineCountTextArea.getText(); // will always be of format: Headlines 1 - 5 of 6
 //			WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
 //			String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
@@ -246,7 +254,8 @@ public class FactivaWebHandler {
 				}
 			}
 		} catch (Exception e) {
-			// do nothing, non fatal error
+			// non fatal error
+			MessageHandler.logMessage("Failed to determine number of results returned");
 		}
 		
 		// check that only one file exists in the download directory
@@ -277,6 +286,8 @@ public class FactivaWebHandler {
 			rtfInputStream = new FileInputStream(downloadRtfFileAbsPath);
 			rtfParser.read(rtfInputStream, txtDoc, 0);
 			String text = txtDoc.getText(0, txtDoc.getLength());
+			// convert UNIX newline to OS's newline
+			text.replace("\n", Constants.LINE_SEPARATOR);
 			outputTxtFileStream = new FileWriter(new File(downloadTxtFileAbsPath));
 			outputTxtFileStream.write(text);
 		} catch (Exception e) {

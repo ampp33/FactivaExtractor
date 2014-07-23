@@ -21,17 +21,24 @@ public class FactivaKeywordValidatorThread implements Runnable {
 	
 	private String username = null;
 	private String password = null;
+	private boolean skipLogin = false;
 	private String spreadsheetFilePath = null;
 	private String firefoxProfileDirPath = null;
 	private FactivaExtractorProgressToken progressToken = null;
 	
 	
-	public FactivaKeywordValidatorThread(FactivaWebHandlerConfig config) {
+	public FactivaKeywordValidatorThread(FactivaWebHandlerConfig config, boolean resetVerifiedItemCache) {
 		this.username = config.getUsername();
 		this.password = config.getPassword();
+		this.skipLogin = config.isSkipLogin();
 		this.spreadsheetFilePath = config.getSpreadsheetFilePath();
 		this.firefoxProfileDirPath = config.getFirefoxProfileDirPath();
 		this.progressToken = config.getProgressToken();
+		if(resetVerifiedItemCache) {
+			verifiedSourceFilters.clear();
+			verifiedCompanyFilters.clear();
+			verifiedSubjectFilters.clear();
+		}
 	}
 
 	@Override
@@ -91,9 +98,11 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		try {
 			this.progressToken.setStatusMessage("Attempting to get to Factiva");
 			handler.getToFactivaLoginPage();
-			this.progressToken.setStatusMessage("Attempting to log in");
-			handler.login(this.username, this.password);
-			this.progressToken.setStatusMessage("Successfully logged in");
+			if(!this.skipLogin) {
+				this.progressToken.setStatusMessage("Attempting to log in");
+				handler.login(this.username, this.password);
+				this.progressToken.setStatusMessage("Successfully logged in");
+			}
 		} catch (Exception e) {
 			reportExceptionToUi("Error occurred starting Factiva", 0, e);
 			return;
@@ -128,10 +137,10 @@ public class FactivaKeywordValidatorThread implements Runnable {
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
-				reportExceptionToUi("Source '" + source + "' is invalid!", 100, qe);
+				reportErrorToUi("Source '" + source + "' is invalid!", 100);
 				return;
 			} catch (Exception e) {
-				reportExceptionToUi("Unexpeced error occurred during validation, quitting...", 100, e);
+				reportErrorToUi("Unexpeced error occurred during validation, quitting...", 100);
 				return;
 			}
 		}
@@ -148,10 +157,10 @@ public class FactivaKeywordValidatorThread implements Runnable {
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
-				reportExceptionToUi("Company '" + company + "' is invalid!", 100, qe);
+				reportErrorToUi("Company '" + company + "' is invalid!", 100);
 				return;
 			} catch (Exception e) {
-				reportExceptionToUi("Unexpeced error occurred during validation, quitting...", 100, e);
+				reportErrorToUi("Unexpeced error occurred during validation, quitting...", 100);
 				return;
 			}
 		}
@@ -168,10 +177,10 @@ public class FactivaKeywordValidatorThread implements Runnable {
 			} catch (FactivaExtractorWebHandlerException we) {
 				// ignore, not that bad
 			} catch (FactivaExtractorQueryException qe) {
-				reportExceptionToUi("Subject '" + subject + "' is invalid!", 100, qe);
+				reportErrorToUi("Subject '" + subject + "' is invalid!", 100);
 				return;
 			} catch (Exception e) {
-				reportExceptionToUi("Unexpeced error occurred during validation, quitting...", 100, e);
+				reportErrorToUi("Unexpeced error occurred during validation, quitting...", 100);
 				return;
 			}
 		}
@@ -182,6 +191,14 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		
 		this.progressToken.setPercentComplete(100);
 		this.progressToken.setStatusMessage("All sources, companies, and subjects verified successfully");
+		MessageHandler.showMessage("All sources, companies, and subjects verified successfully");
+	}
+	
+	private void reportErrorToUi(String message, int percentComplete) {
+		this.progressToken.setErrorOccurred(true);
+		this.progressToken.setPercentComplete(0);
+		this.progressToken.setStatusMessage(message);
+		MessageHandler.showErrorMessage(message);
 	}
 	
 	private void reportExceptionToUi(String message, int percentComplete, Exception e) {

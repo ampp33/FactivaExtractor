@@ -42,6 +42,7 @@ import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
 import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
+import javax.swing.JCheckBox;
 
 public class FactivaExtractorUi {
 
@@ -49,8 +50,10 @@ public class FactivaExtractorUi {
 	private JLabel lblDirectory;
 	private JTextField textFieldUsername;
 	private JTextField textFieldPassword;
+	private JCheckBox chckbxSkipLogin;
 	
 	private boolean spreadsheetVerified = false;
+	private boolean resetVerifiedItemCache = false;
 	private JTextField textField;
 	
 	
@@ -91,14 +94,14 @@ public class FactivaExtractorUi {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
 		frmFactivaextractorV.setTitle("FactivaExtractor v1.0");
-		frmFactivaextractorV.setBounds(100, 100, 650, 681);
+		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
 		
 		final JFrame mainFrame = frmFactivaextractorV;
 		
 		JPanel panel = new JPanel();
-		panel.setBounds(0, 0, 644, 648);
+		panel.setBounds(0, 0, 644, 695);
 		panel.setBackground(Color.WHITE);
 		frmFactivaextractorV.getContentPane().add(panel);
 		panel.setLayout(null);
@@ -114,16 +117,16 @@ public class FactivaExtractorUi {
 		panel.add(lblUsername);
 
 		textFieldUsername = new JTextField(System.getProperty("USERNAME"));
-		textFieldUsername.setBounds(328, 118, 116, 22);
+		textFieldUsername.setBounds(328, 118, 151, 22);
 		panel.add(textFieldUsername);
 		textFieldUsername.setColumns(10);
 
 		JLabel lblPassword = new JLabel("Password:");
-		lblPassword.setBounds(449, 121, 60, 16);
+		lblPassword.setBounds(260, 145, 60, 16);
 		panel.add(lblPassword);
 
 		textFieldPassword = new JPasswordField(System.getProperty("PASSWORD"));
-		textFieldPassword.setBounds(514, 118, 116, 22);
+		textFieldPassword.setBounds(328, 142, 151, 22);
 		panel.add(textFieldPassword);
 		textFieldPassword.setColumns(10);
 
@@ -136,16 +139,16 @@ public class FactivaExtractorUi {
 		JLabel lblStepSelect = new JLabel(
 				"Step 2: Select working directory (should be an empty directory except for your excel file)");
 		lblStepSelect.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepSelect.setBounds(10, 150, 620, 16);
+		lblStepSelect.setBounds(10, 173, 620, 16);
 		panel.add(lblStepSelect);
 		
 		lblDirectory = new JLabel("<please select a directory>");
-		lblDirectory.setBounds(193, 175, 437, 16);
+		lblDirectory.setBounds(193, 198, 437, 16);
 		panel.add(lblDirectory);
 
 		JButton btnSelectWorkingDirectory = new JButton(
 				"Select working directory");
-		btnSelectWorkingDirectory.setBounds(10, 171, 171, 25);
+		btnSelectWorkingDirectory.setBounds(10, 194, 171, 25);
 		btnSelectWorkingDirectory.addActionListener(new ActionListener() {
 			@Override
 			public void actionPerformed(ActionEvent arg0) {
@@ -161,6 +164,7 @@ public class FactivaExtractorUi {
 			    	lblDirectory.setText("<please select a directory>");
 			    }
 			    spreadsheetVerified = false;
+			    resetVerifiedItemCache = true;
 			}
 		});
 		panel.add(btnSelectWorkingDirectory);
@@ -168,7 +172,7 @@ public class FactivaExtractorUi {
 		JLabel lblStepValidate = new JLabel(
 				"Step 3: Validate the Excel file (make sure no issues exist)");
 		lblStepValidate.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepValidate.setBounds(10, 204, 620, 16);
+		lblStepValidate.setBounds(10, 227, 620, 16);
 		panel.add(lblStepValidate);
 
 		JButton btnValidate = new JButton("Validate");
@@ -203,13 +207,13 @@ public class FactivaExtractorUi {
 				spreadsheetVerified = true;
 			}
 		});
-		btnValidate.setBounds(10, 222, 97, 25);
+		btnValidate.setBounds(10, 245, 97, 25);
 		panel.add(btnValidate);
 
 		JLabel lblStepRun = new JLabel(
 				"Step 6: Run (will display status messages below)");
 		lblStepRun.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepRun.setBounds(10, 368, 325, 16);
+		lblStepRun.setBounds(10, 391, 325, 16);
 		panel.add(lblStepRun);
 		
 		final JProgressBar progressBar = new JProgressBar();
@@ -226,6 +230,7 @@ public class FactivaExtractorUi {
 				// get username and password
 				String username = textFieldUsername.getText();
 				String password = textFieldPassword.getText();
+				boolean skipLogin = chckbxSkipLogin.isSelected();
 				
 				// get spreadsheet file path
 				File workingDir = new File(lblDirectory.getText());
@@ -274,7 +279,7 @@ public class FactivaExtractorUi {
 				if(System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) != null) {
 					fireFoxProfileDirPath = System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
 				} else {
-					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FIREFOX_PROFILE_DIR_NAME;
+					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FILE_SEPARATOR + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
 				}
 				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
@@ -292,6 +297,7 @@ public class FactivaExtractorUi {
 				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
 				config.setUsername(username);
 				config.setPassword(password);
+				config.setSkipLogin(skipLogin);
 				if(alertEmailAddress != null && alertEmailAddress.trim().length() != 0) {
 					config.setAlertEmailAddress(alertEmailAddress);
 				}
@@ -305,32 +311,32 @@ public class FactivaExtractorUi {
 				new Thread(new FactivaExtractorThread(config)).start();
 			}
 		});
-		btnRun.setBounds(10, 387, 97, 25);
+		btnRun.setBounds(10, 410, 97, 25);
 		panel.add(btnRun);
 
 		JLabel lblStepCheck = new JLabel("Progress:");
 		lblStepCheck.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepCheck.setBounds(10, 444, 68, 16);
+		lblStepCheck.setBounds(10, 467, 68, 16);
 		panel.add(lblStepCheck);
 
-		progressBar.setBounds(81, 446, 549, 14);
+		progressBar.setBounds(81, 469, 549, 14);
 		panel.add(progressBar);
 
 		JLabel lblStatus = new JLabel("Status:");
 		lblStatus.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStatus.setBounds(10, 425, 68, 16);
+		lblStatus.setBounds(10, 448, 68, 16);
 		panel.add(lblStatus);
 
-		lblStatusMessage.setBounds(81, 425, 549, 16);
+		lblStatusMessage.setBounds(81, 448, 549, 16);
 		panel.add(lblStatusMessage);
 
 		JLabel lblLog_1 = new JLabel("Log:");
 		lblLog_1.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblLog_1.setBounds(10, 473, 33, 16);
+		lblLog_1.setBounds(10, 496, 33, 16);
 		panel.add(lblLog_1);
 		
 		JPanel panel_1 = new JPanel();
-		panel_1.setBounds(43, 473, 587, 162);
+		panel_1.setBounds(43, 496, 587, 186);
 		panel.add(panel_1);
 		panel_1.setLayout(new BorderLayout(0, 0));
 				
@@ -348,7 +354,7 @@ public class FactivaExtractorUi {
 		
 		JLabel lblStepoptional = new JLabel("Step 4 (optional): Validate spreadsheet Source, Company, and Subjects");
 		lblStepoptional.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepoptional.setBounds(10, 260, 587, 16);
+		lblStepoptional.setBounds(10, 283, 587, 16);
 		panel.add(lblStepoptional);
 		
 		JButton btnValidate_1 = new JButton("Validate");
@@ -361,6 +367,7 @@ public class FactivaExtractorUi {
 				// get username and password
 				String username = textFieldUsername.getText();
 				String password = textFieldPassword.getText();
+				boolean skipLogin = chckbxSkipLogin.isSelected();
 				
 				// get spreadsheet file path
 				File workingDir = new File(lblDirectory.getText());
@@ -378,7 +385,7 @@ public class FactivaExtractorUi {
 				if(System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) != null) {
 					fireFoxProfileDirPath = System.getProperty(Constants.OVERRIDE_FIREFOX_PROFILE_DIR) + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
 				} else {
-					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FIREFOX_PROFILE_DIR_NAME;
+					fireFoxProfileDirPath = FilesystemUtil.getJarDirectory() + Constants.FILE_SEPARATOR + Constants.getInstance().getConstant(Constants.FIREFOX_PROFILE_DIR_NAME);
 				}
 				
 				FactivaExtractorProgressToken progressToken = new FactivaExtractorProgressToken();
@@ -394,31 +401,33 @@ public class FactivaExtractorUi {
 				FactivaWebHandlerConfig config = new FactivaWebHandlerConfig();
 				config.setUsername(username);
 				config.setPassword(password);
+				config.setSkipLogin(skipLogin);
 				config.setSpreadsheetFilePath(spreadsheetFilePath);
 				config.setFirefoxProfileDirPath(fireFoxProfileDirPath);
 				config.setProgressToken(progressToken);
 				
-				new Thread(new FactivaKeywordValidatorThread(config)).start();
+				new Thread(new FactivaKeywordValidatorThread(config, resetVerifiedItemCache)).start();
+				resetVerifiedItemCache = false;
 			}
 		});
-		btnValidate_1.setBounds(10, 283, 97, 25);
+		btnValidate_1.setBounds(10, 306, 97, 25);
 		panel.add(btnValidate_1);
 		
 		JLabel lblStepoptional_1 = new JLabel("Step 5 (optional): Specify an email address to contact if processing has errors or completes");
 		lblStepoptional_1.setFont(new Font("Tahoma", Font.BOLD, 13));
-		lblStepoptional_1.setBounds(10, 316, 620, 16);
+		lblStepoptional_1.setBounds(10, 339, 620, 16);
 		panel.add(lblStepoptional_1);
 		
 		JLabel lblEmailAddress = new JLabel("Email address:");
-		lblEmailAddress.setBounds(10, 339, 97, 16);
+		lblEmailAddress.setBounds(10, 362, 97, 16);
 		panel.add(lblEmailAddress);
 		
 		textField = new JTextField();
-		textField.setBounds(106, 336, 146, 22);
+		textField.setBounds(106, 359, 146, 22);
 		panel.add(textField);
 		textField.setColumns(10);
 		
-		JButton btnUpdateSpreadsheetFrom = new JButton("Update Spreadsheet from Cache");
+		JButton btnUpdateSpreadsheetFrom = new JButton("Try to Recover from Failed Run");
 		btnUpdateSpreadsheetFrom.addActionListener(new ActionListener() {
 			public void actionPerformed(ActionEvent arg0) {
 				if(!verifyAll()) {
@@ -439,6 +448,11 @@ public class FactivaExtractorUi {
 				FactivaQueryProgressCache progressCache = null;
 				try {
 					progressCache = new FactivaQueryProgressCache(workingDir.getAbsolutePath());
+					// let user know if cache doesn't exist
+					if(!progressCache.doesCacheFileExist()) {
+						MessageHandler.showMessage("No cache to recover from, recovery not possible");
+						return;
+					}
 					progressCache.close(); // we don't want to write to it, just read
 					spreadsheet = new FactivaQuerySpreadsheetProcessor(spreadsheetFilePath);
 				} catch (IOException | FactivaSpreadsheetException e) {
@@ -467,10 +481,11 @@ public class FactivaExtractorUi {
 				} catch (Exception e) {
 					MessageHandler.logMessage("Failed to delete cache file, may need to be deleted manually");
 				}
+				MessageHandler.showMessage("Recovery successful!");
 				MessageHandler.logMessage("Finished updating spreadsheet from cache");
 			}
 		});
-		btnUpdateSpreadsheetFrom.setBounds(124, 387, 260, 25);
+		btnUpdateSpreadsheetFrom.setBounds(124, 410, 260, 25);
 		panel.add(btnUpdateSpreadsheetFrom);
 		
 		JButton btnSendTestEmail = new JButton("Send Test Email");
@@ -492,8 +507,14 @@ public class FactivaExtractorUi {
 				}
 			}
 		});
-		btnSendTestEmail.setBounds(260, 335, 158, 25);
+		btnSendTestEmail.setBounds(260, 358, 158, 25);
 		panel.add(btnSendTestEmail);
+		
+		JCheckBox chckbxSkipLogin = new JCheckBox("Skip login");
+		this.chckbxSkipLogin = chckbxSkipLogin;
+		chckbxSkipLogin.setBackground(Color.WHITE);
+		chckbxSkipLogin.setBounds(487, 117, 113, 25);
+		panel.add(chckbxSkipLogin);
 	}
 	
 	private boolean verifyWorkingDirectory() {

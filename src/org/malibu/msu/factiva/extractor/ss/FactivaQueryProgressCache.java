@@ -20,14 +20,21 @@ public class FactivaQueryProgressCache {
 		if(!workingDir.exists() || !workingDir.isDirectory()) {
 			throw new FileNotFoundException("directory doesn't exist, or isn't a directory");
 		}
-		// open file in append mode
 		this.cacheFilePath = workingDir.getAbsolutePath() + Constants.FILE_SEPARATOR + CACHE_FILE_NAME;
-		this.outputStream = new FileWriter(cacheFilePath, true);
 	}
 	
 	public void cacheFactivaQueryProgress(String queryId, int queryRow, boolean isProcessed, int resultCount, String comment) throws IOException {
+		if(this.outputStream == null) {
+			// open file in append mode
+			this.outputStream = new FileWriter(cacheFilePath, true);
+		}
 		this.outputStream.write(queryId + ":" + queryRow + ":" + isProcessed + ":" + resultCount + ":" + comment + "\n");
 		this.outputStream.flush();
+	}
+	
+	public boolean doesCacheFileExist() {
+		File cacheFile = new File(this.cacheFilePath);
+		return cacheFile.exists() && cacheFile.isFile();
 	}
 	
 	public void deleteCache() throws IOException {
@@ -38,7 +45,9 @@ public class FactivaQueryProgressCache {
 	}
 	
 	public void close() throws IOException {
-		this.outputStream.close();
+		if(this.outputStream != null) {
+			this.outputStream.close();
+		}
 	}
 	
 	public void writeCachedEntriesToSpreadsheet(FactivaQuerySpreadsheetProcessor spreadsheet) throws IOException {

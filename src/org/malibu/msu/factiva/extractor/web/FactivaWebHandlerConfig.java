@@ -5,6 +5,7 @@ import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
 public class FactivaWebHandlerConfig {
 	private String username = null;
 	private String password = null;
+	private boolean skipLogin = false;
 	private String alertEmailAddress = null;
 	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
@@ -24,6 +25,12 @@ public class FactivaWebHandlerConfig {
 	}
 	public void setPassword(String password) {
 		this.password = password;
+	}
+	public boolean isSkipLogin() {
+		return skipLogin;
+	}
+	public void setSkipLogin(boolean skipLogin) {
+		this.skipLogin = skipLogin;
 	}
 	public String getAlertEmailAddress() {
 		return alertEmailAddress;

@@ -23,6 +23,7 @@ public class FactivaExtractorThread implements Runnable {
 	
 	private String username = null;
 	private String password = null;
+	private boolean skipLogin = false;
 	private String alertEmailAddress = null;
 	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
@@ -35,6 +36,7 @@ public class FactivaExtractorThread implements Runnable {
 	public FactivaExtractorThread(FactivaWebHandlerConfig config) {
 		this.username = config.getUsername();
 		this.password = config.getPassword();
+		this.skipLogin = config.isSkipLogin();
 		this.alertEmailAddress = config.getAlertEmailAddress();
 		this.workingDirPath = config.getWorkingDirPath();
 		this.spreadsheetFilePath = config.getSpreadsheetFilePath();
@@ -79,9 +81,11 @@ public class FactivaExtractorThread implements Runnable {
 		try {
 			this.progressToken.setStatusMessage("Attempting to get to Factiva");
 			handler.getToFactivaLoginPage();
-			this.progressToken.setStatusMessage("Attempting to log in");
-			handler.login(this.username, this.password);
-			this.progressToken.setStatusMessage("Successfully logged in");
+			if(!this.skipLogin) {
+				this.progressToken.setStatusMessage("Attempting to log in");
+				handler.login(this.username, this.password);
+				this.progressToken.setStatusMessage("Successfully logged in");
+			}
 		} catch (Exception e) {
 			reportExceptionToUi("Error occurred starting Factiva", 0, e);
 			return;

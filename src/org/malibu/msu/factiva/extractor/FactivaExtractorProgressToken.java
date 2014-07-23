@@ -17,6 +17,8 @@ public class FactivaExtractorProgressToken {
 		if(listener != null) {
 			listener.stateChanged(this);
 		}
+		// reset
+		this.statusMessage = null;
 	}
 	public int getPercentComplete() {
 		return percentComplete;

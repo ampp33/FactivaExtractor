@@ -42,7 +42,7 @@ public class FactivaWebHandler {
 	private String downloadDestinationDirectory = null;
 	
 	public FactivaWebHandler(String firefoxProfileDirectory) throws FactivaExtractorWebHandlerException {
-		this(firefoxProfileDirectory, false);
+		this(firefoxProfileDirectory, true);
 	}
 	
 	public FactivaWebHandler(String firefoxProfileDirectory, boolean initializeDriver) throws FactivaExtractorWebHandlerException {

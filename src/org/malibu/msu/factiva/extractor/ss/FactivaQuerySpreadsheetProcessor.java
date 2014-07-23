@@ -110,7 +110,7 @@ public class FactivaQuerySpreadsheetProcessor {
 			if(currentRow == null) continue;
 			// check if we found a new ID
 			String id = getCellValueAsString(evaluator, currentRow.getCell(ID_COLUMN_INDEX));
-			if(id != null && !id.equals(currentId)) {
+			if(id != null && id.trim().length() > 0 && !id.equals(currentId)) {
 				// found a new ID
 				currentQuery = new FactivaQuery();
 				currentQuery.setSources(new ArrayList<String>());

@@ -11,6 +11,7 @@ public class FactivaQuery {
 	private String companyName;
 	private List<String> sources;
 	private List<String> subjects;
+	private String searchText;
 	private boolean isProcessed = false;
 	
 	public String getId() {
@@ -60,5 +61,11 @@ public class FactivaQuery {
 	}
 	public void setProcessed(boolean isProcessed) {
 		this.isProcessed = isProcessed;
+	}
+	public String getSearchText() {
+		return searchText;
+	}
+	public void setSearchText(String searchText) {
+		this.searchText = searchText;
 	}
 }

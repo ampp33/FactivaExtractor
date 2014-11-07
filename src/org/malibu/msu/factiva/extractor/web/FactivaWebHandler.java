@@ -18,7 +18,9 @@ import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerExce
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
 import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
+import org.malibu.msu.factiva.extractor.util.StringUtil;
 import org.openqa.selenium.By;
+import org.openqa.selenium.JavascriptExecutor;
 import org.openqa.selenium.NoSuchElementException;
 import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
@@ -174,11 +176,23 @@ public class FactivaWebHandler {
 		} catch (FactivaExtractorWebHandlerException e) {
 			throw new FactivaExtractorQueryException("failed to set companies", e);
 		}
-		// set subjects
-		try {
-			inputFieldsInExpandableSection("nsTab", "nsTxt", query.getSubjects());
-		} catch (FactivaExtractorWebHandlerException e) {
-			throw new FactivaExtractorQueryException("failed to set subjects", e);
+		// set subjects and/or search text
+		if(query.getSearchText() != null && query.getSearchText().trim().length() > 0) {
+			// set search text
+			try {
+				WebElement fromMonthTextArea = driver.findElement(By.id("ftx"));
+				fromMonthTextArea.sendKeys(query.getSearchText());
+			} catch (Exception e) {
+				throw new FactivaExtractorQueryException("Failed to set search text", e);
+			}
+		}
+		if (query.getSubjects() != null && query.getSubjects().size() > 0) {
+			// set subjects
+			try {
+				inputFieldsInExpandableSection("nsTab", "nsTxt", query.getSubjects());
+			} catch (FactivaExtractorWebHandlerException e) {
+				throw new FactivaExtractorQueryException("failed to set subjects", e);
+			}
 		}
 		
 		try {
@@ -286,11 +300,12 @@ public class FactivaWebHandler {
 			rtfInputStream = new FileInputStream(downloadRtfFileAbsPath);
 			rtfParser.read(rtfInputStream, txtDoc, 0);
 			String text = txtDoc.getText(0, txtDoc.getLength());
+			// convert newlines to system specific newline chars
+			text = StringUtil.convertNewlinesToSystemNewlines(text);
 			// convert UNIX newline to OS's newline
-			text.replace("\n", Constants.LINE_SEPARATOR);
 			outputTxtFileStream = new FileWriter(new File(downloadTxtFileAbsPath));
 			outputTxtFileStream.write(text);
-		} catch (Exception e) {
+		} catch (Exception e) {e.printStackTrace();
 			throw new FactivaExtractorQueryException("failed convert file from .rtf to .txt", e);
 		} finally {
 			if(rtfInputStream != null) {
@@ -377,10 +392,17 @@ public class FactivaWebHandler {
 		}
 		// loop through each search criteria and add it
 		for (String searchString : values) {
+			
 			// input search string
 			try {
+				
+				// enter text via javascript to avoid funky issue caused by jQuery, where ampersands weren't being entered
+				JavascriptExecutor jsExec = (JavascriptExecutor)this.driver;
+				jsExec.executeScript("document.getElementById('" + inputElementId + "').value = \"" + searchString + "\";");
+				
+				// required in order for autocomplete to detect input text?
 				WebElement inputElement = driver.findElement(By.id(inputElementId));
-				inputElement.sendKeys(searchString);
+				inputElement.sendKeys(" ");
 			} catch (Exception e) {
 				throw new FactivaExtractorWebHandlerException("unable to enter text in autocomplete text area (HTML element ID: '" + inputElementId + "')");
 			}

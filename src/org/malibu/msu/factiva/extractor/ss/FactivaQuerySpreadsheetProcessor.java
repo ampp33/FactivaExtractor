@@ -29,21 +29,23 @@ public class FactivaQuerySpreadsheetProcessor {
 	private FormulaEvaluator evaluator = null;
 	
 	private static final String SHEET_NAME = "Queries";
-	private static final String[] COLUMNS = new String[] {"ID","SOURCE","COMPANY","SUBJECT","START_DATE","END_DATE"};
+	private static final String[] COLUMNS = new String[] {"ID","SOURCE","COMPANY","SUBJECT","START_DATE","END_DATE","SEARCH_TEXT"};
 	private static final int ID_COLUMN_INDEX = 0;
 	private static final int SOURCE_COLUMN_INDEX = 1;
 	private static final int COMPANY_COLUMN_INDEX = 2;
 	private static final int SUBJECT_COLUMN_INDEX = 3;
 	private static final int START_DATE_COLUMN_INDEX = 4;
 	private static final int END_DATE_COLUMN_INDEX = 5;
+	private static final int SEARCH_TEXT_COLUMN_INDEX = 6;
+	
 	
 	private Workbook workbook = null;
 	private String filePath = null;
 	
 	private static final String[] PROCESSING_COLUMNS = new String[] {"PROCESSED","RESULT_COUNT","COMMENT"};
-	private static final int PROCESSED_COLUMN_INDEX = 6;
-	private static final int RESULT_COUNT_COLUMN_INDEX = 7;
-	private static final int COMMENT_COLUMN_INDEX = 8;
+	private static final int PROCESSED_COLUMN_INDEX = 7;
+	private static final int RESULT_COUNT_COLUMN_INDEX = 8;
+	private static final int COMMENT_COLUMN_INDEX = 9;
 	
 	/**
 	 * Constructor that accepts a file path, and verifies the spreadsheet before
@@ -142,6 +144,10 @@ public class FactivaQuerySpreadsheetProcessor {
 			if(endDate != null) {
 				currentQuery.setDateRangeTo(endDate);
 			}
+			String searchText = getCellValueAsString(evaluator, currentRow.getCell(SEARCH_TEXT_COLUMN_INDEX));
+			if(searchText != null && searchText.trim().length() != 0) {
+				currentQuery.setSearchText(searchText);
+			}
 			String isProcessedString = getCellValueAsString(evaluator, currentRow.getCell(PROCESSED_COLUMN_INDEX));
 			boolean isProcessed = isProcessedString == null ? false : "X".equals(isProcessedString);
 			currentQuery.setProcessed(isProcessed);
@@ -184,15 +190,15 @@ public class FactivaQuerySpreadsheetProcessor {
 				if(!FilesystemUtil.isValidFileName(query.getId())) {
 					addOrThrowError("query at row " + query.getQueryRowNumber() + " has an ID that won't translate to an acceptable filename", errorMessages, throwExceptions);
 				}
-				String errorMessagePrefix = "query '" + query.getId() + "' at row " + query.getQueryRowNumber();
+				String errorMessagePrefix = "query '" + query.getId() + "' at row " + (query.getQueryRowNumber() + 1);
 				if(query.getSources() == null || query.getSources().size() == 0) {
 					addOrThrowError(errorMessagePrefix + " has no sources", errorMessages, throwExceptions);
 				}
 				if(query.getCompanyName() == null || query.getCompanyName().trim().length() == 0) {
 					addOrThrowError(errorMessagePrefix + " has no company name", errorMessages, throwExceptions);
 				}
-				if(query.getSubjects() == null || query.getSubjects().size() == 0) {
-					addOrThrowError(errorMessagePrefix + " has no subjects", errorMessages, throwExceptions);
+				if((query.getSubjects() == null || query.getSubjects().size() == 0) && (query.getSearchText() == null || query.getSearchText().trim().length() == 0)) {
+					addOrThrowError(errorMessagePrefix + " has no subjects or search text", errorMessages, throwExceptions);
 				}
 				if(query.getDateRangeFrom() == null) {
 					addOrThrowError(errorMessagePrefix + " has no start date, or has an invalid value", errorMessages, throwExceptions);

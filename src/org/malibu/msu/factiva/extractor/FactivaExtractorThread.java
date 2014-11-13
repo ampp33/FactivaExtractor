@@ -176,6 +176,7 @@ public class FactivaExtractorThread implements Runnable {
 		
 		// logout and close window
 		// TODO: should this occur any time we run into errors?
+		MessageHandler.logMessage("Attempting to log out of Factiva");
 		this.progressToken.setStatusMessage("Closing Factiva...");
 		try {
 			handler.logout();

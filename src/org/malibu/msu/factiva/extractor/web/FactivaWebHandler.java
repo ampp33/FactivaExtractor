@@ -230,7 +230,8 @@ public class FactivaWebHandler {
 	}
 	
 	/**
-	 * Checks if a *.part file exists in the download directory (signifying that a file download is in progress)
+	 * Checks if a *.part file exists in the download directory (signifying that a file download is in progress),
+	 * or if we can't write to one of the files in the download dir (suggesting the file is still in use)
 	 * 
 	 * @return true if a download is in progress, false otherwise
 	 */
@@ -239,6 +240,8 @@ public class FactivaWebHandler {
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
 		for (File file : downloadedFiles) {
 			if(file != null && file.getName().endsWith(".part")) {
+				return true;
+			} else if (!file.canWrite()) {
 				return true;
 			}
 		}
@@ -251,8 +254,8 @@ public class FactivaWebHandler {
 	 * @throws FactivaExtractorFatalException if download takes long than the MAX_DOWNLOAD_WAIT_TIME,
 	 * this exception gets thrown
 	 */
-	private void waitForDownloadsToFinish() throws FactivaExtractorFatalException {
-		int millisecondsWaited = 0;
+	private long waitForDownloadsToFinish() throws FactivaExtractorFatalException {
+		long millisecondsWaited = 0;
 		while(isFileDownloadInProgress() && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
 			try { Thread.sleep(500); } catch (InterruptedException e) {}
 			millisecondsWaited += 500;
@@ -261,10 +264,12 @@ public class FactivaWebHandler {
 		if(isFileDownloadInProgress()) {
 			throw new FactivaExtractorFatalException("file download lasted longer than allowed, maybe you're on a slow network?");
 		}
+		return millisecondsWaited;
 	}
 
 	private void convertDownloadedRtfFileToTxt(FactivaQuery query) throws FactivaExtractorFatalException, FactivaExtractorQueryException, IOException {
-		waitForDownloadsToFinish();
+		long timeWaitedForDownload = waitForDownloadsToFinish();
+		MessageHandler.logMessage("had to wait " + timeWaitedForDownload + " ms for download to finish");
 		
 		// check that only one file exists in the download directory
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
@@ -428,11 +433,11 @@ public class FactivaWebHandler {
 	private long waitForFilesystem(File file) throws IOException {
 		long timeWaited = 0;
 		if(file != null) {
-			while(file.length() < 10 && timeWaited < MAX_TIME_TO_WAIT_FOR_FS_IN_MS) {
+			while(!file.canWrite() && timeWaited < MAX_TIME_TO_WAIT_FOR_FS_IN_MS) {
 				try { Thread.sleep(500); } catch (InterruptedException e) {}
 				timeWaited += 500;
 			}
-			if(file.length() < 10) {
+			if(!file.canWrite()) {
 				throw new IOException("timed out waiting for filesystem to refresh file: " + file.getAbsolutePath());
 			}
 		}

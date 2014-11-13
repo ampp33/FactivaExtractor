@@ -1,5 +1,6 @@
 package org.malibu.msu.factiva.extractor;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.Date;
 import java.util.List;
@@ -48,6 +49,7 @@ public class FactivaExtractorThread implements Runnable {
 
 	@Override
 	public void run() {
+		// check if pausing is enabled (random pauses to make the app look more human to the Factiva server)
 		boolean enablePausing = Boolean.parseBoolean(Constants.getInstance().getConstant(Constants.ENABLE_PAUSING));
 		int maxSecondsToPause = 0;
 		try {
@@ -57,6 +59,7 @@ public class FactivaExtractorThread implements Runnable {
 			MessageHandler.logMessage("Pausing enabled");
 		}
 		
+		// get spreadsheet entries and setup result cache
 		FactivaQuerySpreadsheetProcessor spreadsheet = null;
 		FactivaQueryProgressCache progressCache = null;
 		List<FactivaQuery> pendingQueries = null;
@@ -65,11 +68,11 @@ public class FactivaExtractorThread implements Runnable {
 			spreadsheet = new FactivaQuerySpreadsheetProcessor(this.spreadsheetFilePath);
 			pendingQueries = spreadsheet.getQueriesFromSpreadsheet(true);
 		} catch (IOException | FactivaSpreadsheetException e1) {
-			reportExceptionToUi("Error occurred load queries from spreadsheet before beginning processing", 0, e1);
+			reportExceptionToUi("Error occurred setting up cache or loading queries from spreadsheet before beginning processing", 0, e1);
 			return;
 		}
 		
-		// begin processing
+		// start browser and get to login page
 		this.progressToken.setStatusMessage("Starting Firefox session...");
 		FactivaWebHandler handler = null;
 		try {
@@ -91,6 +94,7 @@ public class FactivaExtractorThread implements Runnable {
 			return;
 		}
 		
+		// run searches
 		int queriesProcessed = 0;
 		for(FactivaQuery query : pendingQueries) {
 			// skip already processed queries
@@ -110,6 +114,10 @@ public class FactivaExtractorThread implements Runnable {
 			
 			// where the magic BEGINS
 			try {
+				if(!cleanupDownloadDirectory()) {
+					MessageHandler.logMessage("failed to cleanup temp download dir, halting processing...");
+					break;
+				}
 				int resultCount = handler.executeQuery(query);
 				progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), true, resultCount, "");
 				this.progressToken.setStatusMessage("Query '" + query.getId() + "' processed successfully!");
@@ -166,9 +174,15 @@ public class FactivaExtractorThread implements Runnable {
 			MessageHandler.logMessage("Failed to delete cache file, may need to be deleted manually");
 		}
 		
-		// close window
+		// logout and close window
 		// TODO: should this occur any time we run into errors?
 		this.progressToken.setStatusMessage("Closing Factiva...");
+		try {
+			handler.logout();
+		} catch (FactivaExtractorWebHandlerException e1) {
+			MessageHandler.logMessage("Failed to logout of Factiva");
+			e1.printStackTrace();
+		}
 		handler.closeWebWindow();
 		
 		// attempt to send completion email
@@ -181,6 +195,23 @@ public class FactivaExtractorThread implements Runnable {
 		}
 		
 		this.progressToken.setStatusMessage("Finished");
+	}
+	
+	private boolean cleanupDownloadDirectory() {
+		File tempDownloadDir = new File(this.tempDownloadDirPath);
+		File[] filesInTempDownloadDir = tempDownloadDir.listFiles();
+		if(tempDownloadDir != null && filesInTempDownloadDir != null) {
+			for (File fileToDelete : filesInTempDownloadDir) {
+				MessageHandler.logMessage("attempting to remove the following unwanted file in the temp download dir: " + fileToDelete.getAbsolutePath());
+				if(fileToDelete.delete()) {
+					MessageHandler.logMessage("successfully deleted file");
+				} else {
+					MessageHandler.logMessage("failed to delete file!");
+					return false;
+				}
+			}
+		}
+		return true;
 	}
 	
 	private void reportExceptionToUi(String message, int percentComplete, Exception e) {

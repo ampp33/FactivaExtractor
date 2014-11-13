@@ -26,9 +26,12 @@ import org.openqa.selenium.WebDriver;
 import org.openqa.selenium.WebElement;
 import org.openqa.selenium.firefox.FirefoxDriver;
 import org.openqa.selenium.firefox.FirefoxProfile;
+import org.openqa.selenium.support.ui.ExpectedConditions;
 import org.openqa.selenium.support.ui.Select;
+import org.openqa.selenium.support.ui.WebDriverWait;
 
 import com.gargoylesoftware.htmlunit.ElementNotFoundException;
+import com.google.common.base.Predicate;
 
 public class FactivaWebHandler {
 	
@@ -36,6 +39,9 @@ public class FactivaWebHandler {
 	private static final String GET_TO_FACTIVA_URL = "http://er.lib.msu.edu/notice.cfm?dblistno=008462";
 	
 	private static final int MAX_DOWNLOAD_WAIT_TIME = 180000;
+	private static final int MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC = 5;
+	private static final int MAX_TIME_TO_WAIT_FOR_PAGE_LOAD_IN_SEC = 20;
+	private static final int MAX_TIME_TO_WAIT_FOR_FS_IN_MS = 5000;
 	
 	private FirefoxProfile profile = null;
 	private WebDriver driver = null;
@@ -138,17 +144,20 @@ public class FactivaWebHandler {
 	}
 	
 	public void logout() throws FactivaExtractorWebHandlerException {
+		// wait for the current page to load before trying to logout
+		waitForPageToFullyLoad();
 		try {
 			// click logout menu
-			// TODO: fix to use better XPath location
-			WebElement logoutMenuLink = driver.findElement(By.xpath("//*[@id='dj_header-wrap']/ul[2]/li/a"));
+			WebElement logoutMenuLink = driver.findElement(By.xpath("//a[contains(@title,'Settings/Tools/Support')]"));
 			logoutMenuLink.click();
 			// click logout link
-			WebElement logoutLink = driver.findElement(By.className("logout"));
+			WebElement logoutLink = driver.findElement(By.xpath("//a[contains(@title,'Logout')]"));
 			logoutLink.click();
 		} catch (ElementNotFoundException | NoSuchElementException ex) {
 			throw new FactivaExtractorWebHandlerException("unable to log out, logout links not found");
 		}
+		// wait for logout to complete
+		waitForPageToFullyLoad();
 	}
 	
 	public void goToSearchPage() throws FactivaExtractorWebHandlerException {
@@ -161,6 +170,160 @@ public class FactivaWebHandler {
 	}
 	
 	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException, FactivaExtractorFatalException {
+		waitForPageToFullyLoad();
+		updateSearchPageFields(query);
+		
+		// submit search
+		try {
+			WebElement searchSubmitButton = driver.findElement(By.xpath("//input[@type='submit']"));
+			searchSubmitButton.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed click search 'submit' button", e);
+		}
+		
+		// download results to a file
+		waitForPageToFullyLoad();
+		try {
+			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
+			WebElement selectAllCheckbox = waitForVisibleElement(driver, By.xpath("//span[@id='selectAll']/input"));
+			selectAllCheckbox.click();
+		} catch (ElementNotFoundException | NoSuchElementException enf) {
+			return 0;
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
+		}
+		
+		int numberOfArticlesDownloaded = -1;
+		try {
+			// click file download button, if available
+			WebElement downloadAsRtfButton = waitForVisibleElement(driver, By.xpath("//li[contains(@class,'ppsrtf')]/a"));
+			downloadAsRtfButton.click();
+			WebElement downloadArticleLink = waitForVisibleElement(driver, By.xpath("//li[contains(@class,'ppsrtf')]//a[contains(text(),'Article Format')]"));
+			downloadArticleLink.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
+		}
+		
+		// attempt to determine number of articles found
+		try {
+			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']"));
+			String headlineCountText = headlineCountTextArea.getText(); // will always be of format: Headlines 1 - 5 of 6
+//			WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
+//			String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
+			
+			if(headlineCountText != null) {
+				String[] textSections = headlineCountText.split(" ");
+				if(textSections != null && textSections.length > 0) {
+					String articleCount = textSections[textSections.length - 1];
+					// try to convert count to a number, if possible
+					numberOfArticlesDownloaded = Integer.valueOf(articleCount);
+				}
+			}
+		} catch (Exception e) {
+			// non fatal error
+			MessageHandler.logMessage("Failed to determine number of results returned");
+		}
+		
+		convertDownloadedRtfFileToTxt(query);
+		
+		return numberOfArticlesDownloaded;
+	}
+	
+	/**
+	 * Checks if a *.part file exists in the download directory (signifying that a file download is in progress)
+	 * 
+	 * @return true if a download is in progress, false otherwise
+	 */
+	private boolean isFileDownloadInProgress() {
+		// if .part file still exists in download directory, wait for it to go away (wait 3 minutes max)
+		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+		for (File file : downloadedFiles) {
+			if(file != null && file.getName().endsWith(".part")) {
+				return true;
+			}
+		}
+		return false;
+	}
+	
+	/**
+	 * Puts the thread to sleep until all file downloads complete
+	 * 
+	 * @throws FactivaExtractorFatalException if download takes long than the MAX_DOWNLOAD_WAIT_TIME,
+	 * this exception gets thrown
+	 */
+	private void waitForDownloadsToFinish() throws FactivaExtractorFatalException {
+		int millisecondsWaited = 0;
+		while(isFileDownloadInProgress() && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
+			try { Thread.sleep(500); } catch (InterruptedException e) {}
+			millisecondsWaited += 500;
+		}
+		// if a download is still in progress after waiting the max amount of time, throw an exception
+		if(isFileDownloadInProgress()) {
+			throw new FactivaExtractorFatalException("file download lasted longer than allowed, maybe you're on a slow network?");
+		}
+	}
+
+	private void convertDownloadedRtfFileToTxt(FactivaQuery query) throws FactivaExtractorFatalException, FactivaExtractorQueryException, IOException {
+		waitForDownloadsToFinish();
+		
+		// check that only one file exists in the download directory
+		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+		if(downloadedFiles == null || downloadedFiles.length != 1) {
+			throw new FactivaExtractorFatalException("unexpected contents in temp download directory");
+		}
+		
+		String downloadRtfFileAbsPath = downloadedFiles[0].getAbsolutePath();
+		String downloadTxtFileAbsPath = downloadedFiles[0].getAbsoluteFile().getParentFile().getAbsolutePath() + Constants.FILE_SEPARATOR + query.getId() + ".txt";
+		File downloadTxtFile = new File(downloadTxtFileAbsPath);
+		
+		// convert rtf file to txt
+		FileInputStream rtfInputStream = null;
+		FileWriter outputTxtFileStream = null;
+		boolean waitForFilesystem = false;
+		try {
+			RTFEditorKit rtfParser = new RTFEditorKit();
+			Document txtDoc = rtfParser.createDefaultDocument();
+			rtfInputStream = new FileInputStream(downloadRtfFileAbsPath);
+			rtfParser.read(rtfInputStream, txtDoc, 0);
+			String text = txtDoc.getText(0, txtDoc.getLength());
+			// convert newlines to system specific newline chars
+			text = StringUtil.convertNewlinesToSystemNewlines(text);
+			outputTxtFileStream = new FileWriter(downloadTxtFile);
+			outputTxtFileStream.write(text);
+			if(text != null && text.length() > 10) {
+				waitForFilesystem = true;
+			}
+		} catch (Exception e) {
+			// delete text file, to avoid polluting the download dir
+			if(!downloadTxtFile.delete()) {
+				MessageHandler.logMessage("failed to delete converted text file (may be okay, if conversion failed): " + downloadTxtFileAbsPath);
+			}
+			throw new FactivaExtractorQueryException("failed convert file from .rtf to .txt", e);
+		} finally {
+			if(rtfInputStream != null) {
+				try { rtfInputStream.close(); } catch (Exception e) {}
+			}
+			if(outputTxtFileStream != null) {
+				// flush is important here!
+				try { outputTxtFileStream.flush(); } catch (Exception e) {}
+				try { outputTxtFileStream.close(); } catch (Exception e) {}
+				if(waitForFilesystem) {
+					long timeWaitedInMs = waitForFilesystem(downloadTxtFile);
+					MessageHandler.logMessage("had to wait " + timeWaitedInMs + " ms for filesystem to catch up before moving file to dest dir");
+				}
+			}
+			// delete rtf file
+			if(!new File(downloadRtfFileAbsPath).delete()) {
+				MessageHandler.logMessage("failed to delete downloaded file: " + downloadRtfFileAbsPath);
+			}
+		}
+		
+		// move downloaded file to destination directory
+		String finalFileName = downloadTxtFile.getName();
+		FilesystemUtil.moveFile(downloadTxtFile, new File(this.downloadDestinationDirectory + finalFileName));
+	}
+
+	private void updateSearchPageFields(FactivaQuery query) throws FactivaExtractorWebHandlerException, FactivaExtractorQueryException {
 		// set sources
 		removeAllPublicationsFilter();
 		try {
@@ -222,110 +385,6 @@ public class FactivaWebHandler {
 		} catch (Exception e) {
 			throw new FactivaExtractorQueryException("Failed to set start and end date", e);
 		}
-		
-		try {
-			WebElement searchSubmitButton = driver.findElement(By.xpath("//input[@type='submit']"));
-			searchSubmitButton.click();
-		} catch (Exception e) {
-			throw new FactivaExtractorQueryException("Failed click search 'submit' button", e);
-		}
-		
-		// download results to a file
-		try {
-			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
-			WebElement selectAllCheckbox = driver.findElement(By.xpath("//span[@id='selectAll']/input"));
-			selectAllCheckbox.click();
-		} catch (ElementNotFoundException | NoSuchElementException enf) {
-			return 0;
-		} catch (Exception e) {
-			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
-		}
-		
-		int numberOfArticlesDownloaded = -1;
-		try {
-			// click file download button, if available
-			WebElement downloadAsRtfButton = driver.findElement(By.xpath("//li[contains(@class,'ppsrtf')]/a"));
-			downloadAsRtfButton.click();
-			WebElement downloadArticleLink = driver.findElement(By.xpath("//li[contains(@class,'ppsrtf')]/ul/li[2]/a"));
-			downloadArticleLink.click();
-		} catch (Exception e) {
-			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
-		}
-		
-		// attempt to determine number of articles found
-		try {
-			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']"));
-			String headlineCountText = headlineCountTextArea.getText(); // will always be of format: Headlines 1 - 5 of 6
-//			WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
-//			String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
-			
-			if(headlineCountText != null) {
-				String[] textSections = headlineCountText.split(" ");
-				if(textSections != null && textSections.length > 0) {
-					String articleCount = textSections[textSections.length - 1];
-					// try to convert count to a number, if possible
-					numberOfArticlesDownloaded = Integer.valueOf(articleCount);
-				}
-			}
-		} catch (Exception e) {
-			// non fatal error
-			MessageHandler.logMessage("Failed to determine number of results returned");
-		}
-		
-		// check that only one file exists in the download directory
-		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
-		
-		// if .part file still exists in download directory, wait for it to go away (wait 3 minutes max)
-		int millisecondsWaited = 0;
-		while(downloadedFiles.length == 2 && (downloadedFiles[0].getName().endsWith(".part") || downloadedFiles[1].getName().endsWith(".part")) && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
-			try { Thread.sleep(500); } catch (InterruptedException e) {}
-			// refresh file list
-			downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
-			millisecondsWaited += 500;
-		}
-		
-		if(downloadedFiles == null || downloadedFiles.length != 1) {
-			throw new FactivaExtractorFatalException("unexpected contents in temp download directory");
-		}
-		
-		String downloadRtfFileAbsPath = downloadedFiles[0].getAbsolutePath();
-		String downloadTxtFileAbsPath = downloadedFiles[0].getAbsoluteFile().getParentFile().getAbsolutePath() + Constants.FILE_SEPARATOR + query.getId() + ".txt";
-		
-		// convert rtf file to txt
-		FileInputStream rtfInputStream = null;
-		FileWriter outputTxtFileStream = null;
-		try {
-			RTFEditorKit rtfParser = new RTFEditorKit();
-			Document txtDoc = rtfParser.createDefaultDocument();
-			rtfInputStream = new FileInputStream(downloadRtfFileAbsPath);
-			rtfParser.read(rtfInputStream, txtDoc, 0);
-			String text = txtDoc.getText(0, txtDoc.getLength());
-			// convert newlines to system specific newline chars
-			text = StringUtil.convertNewlinesToSystemNewlines(text);
-			// convert UNIX newline to OS's newline
-			outputTxtFileStream = new FileWriter(new File(downloadTxtFileAbsPath));
-			outputTxtFileStream.write(text);
-		} catch (Exception e) {e.printStackTrace();
-			throw new FactivaExtractorQueryException("failed convert file from .rtf to .txt", e);
-		} finally {
-			if(rtfInputStream != null) {
-				try { rtfInputStream.close(); } catch (Exception e) {}
-			}
-			if(outputTxtFileStream != null) {
-				try { outputTxtFileStream.close(); } catch (Exception e) {}
-			}
-		}
-		
-		// delete rtf file
-		if(!new File(downloadRtfFileAbsPath).delete()) {
-			throw new FactivaExtractorFatalException("failed to delete original rtf file: '" + downloadRtfFileAbsPath + "'");
-		}
-		
-		// move downloaded file to destination directory
-		String finalFileName = new File(downloadTxtFileAbsPath).getName();
-		FilesystemUtil.moveFile(downloadTxtFileAbsPath, this.downloadDestinationDirectory + finalFileName);
-		
-		return numberOfArticlesDownloaded;
 	}
 	
 	public void testSearchFilter(String tabElementId, String inputElementId, String listId, String value) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException {
@@ -358,6 +417,38 @@ public class FactivaWebHandler {
 	
 	public void closeWebWindow() {
 		this.driver.close();
+	}
+	
+	/**
+	 * Waits for the filesystem to register a non-empty file size,
+	 * which is necessary if we're processing so fast that the filesystem can't
+	 * keep up
+	 * @throws IOException 
+	 */
+	private long waitForFilesystem(File file) throws IOException {
+		long timeWaited = 0;
+		if(file != null) {
+			while(file.length() < 10 && timeWaited < MAX_TIME_TO_WAIT_FOR_FS_IN_MS) {
+				try { Thread.sleep(500); } catch (InterruptedException e) {}
+				timeWaited += 500;
+			}
+			if(file.length() < 10) {
+				throw new IOException("timed out waiting for filesystem to refresh file: " + file.getAbsolutePath());
+			}
+		}
+		return timeWaited;
+	}
+	
+	private void waitForPageToFullyLoad() {
+		new WebDriverWait(driver, MAX_TIME_TO_WAIT_FOR_PAGE_LOAD_IN_SEC).until( new Predicate<WebDriver>() {
+            public boolean apply(WebDriver driver) {
+                return ((JavascriptExecutor)driver).executeScript("return document.readyState").equals("complete");
+            }
+        });
+	}
+	
+	private WebElement waitForVisibleElement(WebDriver driver, By byPath) {
+		return new WebDriverWait(driver, MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC).until(ExpectedConditions.visibilityOfElementLocated(byPath));
 	}
 	
 	// UPDATE TO SAVE TO A SPECIFIC DIRECTORY ALWAYS, AND _MOVE_ THE FILE AFTER THE DOWNLOAD IS DONE.  GLORIOUS, THOUGH,

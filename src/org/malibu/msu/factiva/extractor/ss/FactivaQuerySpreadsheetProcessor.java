@@ -317,6 +317,7 @@ public class FactivaQuerySpreadsheetProcessor {
 		} finally {
 			// close output stream, if we can
 			if(fos != null) {
+				try { fos.flush(); } catch (Exception e) {}
 				try { fos.close(); } catch (Exception e) {}
 			}
 		}

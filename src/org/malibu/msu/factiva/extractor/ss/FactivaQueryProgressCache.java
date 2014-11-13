@@ -46,6 +46,7 @@ public class FactivaQueryProgressCache {
 	
 	public void close() throws IOException {
 		if(this.outputStream != null) {
+			this.outputStream.flush();
 			this.outputStream.close();
 		}
 	}
@@ -55,7 +56,7 @@ public class FactivaQueryProgressCache {
 		// deleting the file afterwards
 		if(this.outputStream != null) {
 			try {
-				this.outputStream.close();
+				close();
 			} catch (IOException e) {}
 		}
 		String line = null;

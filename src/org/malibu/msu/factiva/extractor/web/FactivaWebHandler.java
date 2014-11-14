@@ -12,7 +12,6 @@ import javax.swing.text.Document;
 import javax.swing.text.rtf.RTFEditorKit;
 
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
-import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
@@ -169,7 +168,7 @@ public class FactivaWebHandler {
 		}
 	}
 	
-	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException, FactivaExtractorFatalException {
+	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException {
 		waitForPageToFullyLoad();
 		updateSearchPageFields(query);
 		
@@ -185,7 +184,7 @@ public class FactivaWebHandler {
 		waitForPageToFullyLoad();
 		try {
 			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
-			WebElement selectAllCheckbox = waitForVisibleElement(driver, By.xpath("//span[@id='selectAll']/input"));
+			WebElement selectAllCheckbox = waitForVisibleElement(By.xpath("//span[@id='selectAll']/input"));
 			selectAllCheckbox.click();
 		} catch (ElementNotFoundException | NoSuchElementException enf) {
 			return 0;
@@ -193,12 +192,15 @@ public class FactivaWebHandler {
 			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
 		}
 		
+		waitForPageToFullyLoad();
 		int numberOfArticlesDownloaded = -1;
 		try {
 			// click file download button, if available
-			WebElement downloadAsRtfButton = waitForVisibleElement(driver, By.xpath("//li[contains(@class,'ppsrtf')]/a"));
+			WebElement downloadAsRtfButton = waitForVisibleElement(By.xpath("//li[contains(@class,'ppsrtf')]/a"));
 			downloadAsRtfButton.click();
-			WebElement downloadArticleLink = waitForVisibleElement(driver, By.xpath("//li[contains(@class,'ppsrtf')]//a[contains(text(),'Article Format')]"));
+			// wait for option dropdown to fully load
+			waitForElementToResize(By.id("listMenu-id-3"));
+			WebElement downloadArticleLink = waitForVisibleElement(By.xpath("//li[contains(@class,'ppsrtf')]//a[text()='Article Format']"));
 			downloadArticleLink.click();
 		} catch (Exception e) {
 			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
@@ -254,7 +256,7 @@ public class FactivaWebHandler {
 	 * @throws FactivaExtractorFatalException if download takes long than the MAX_DOWNLOAD_WAIT_TIME,
 	 * this exception gets thrown
 	 */
-	private long waitForDownloadsToFinish() throws FactivaExtractorFatalException {
+	private long waitForDownloadsToFinish() throws FactivaExtractorQueryException {
 		long millisecondsWaited = 0;
 		while(isFileDownloadInProgress() && millisecondsWaited < MAX_DOWNLOAD_WAIT_TIME) {
 			try { Thread.sleep(500); } catch (InterruptedException e) {}
@@ -262,19 +264,19 @@ public class FactivaWebHandler {
 		}
 		// if a download is still in progress after waiting the max amount of time, throw an exception
 		if(isFileDownloadInProgress()) {
-			throw new FactivaExtractorFatalException("file download lasted longer than allowed, maybe you're on a slow network?");
+			throw new FactivaExtractorQueryException("file download lasted longer than allowed, maybe you're on a slow network?");
 		}
 		return millisecondsWaited;
 	}
 
-	private void convertDownloadedRtfFileToTxt(FactivaQuery query) throws FactivaExtractorFatalException, FactivaExtractorQueryException, IOException {
+	private void convertDownloadedRtfFileToTxt(FactivaQuery query) throws FactivaExtractorQueryException, IOException {
 		long timeWaitedForDownload = waitForDownloadsToFinish();
 		MessageHandler.logMessage("had to wait " + timeWaitedForDownload + " ms for download to finish");
 		
 		// check that only one file exists in the download directory
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
-			throw new FactivaExtractorFatalException("unexpected contents in temp download directory");
+			throw new FactivaExtractorQueryException("unexpected contents in temp download directory");
 		}
 		
 		String downloadRtfFileAbsPath = downloadedFiles[0].getAbsolutePath();
@@ -452,7 +454,23 @@ public class FactivaWebHandler {
         });
 	}
 	
-	private WebElement waitForVisibleElement(WebDriver driver, By byPath) {
+	private void waitForElementToResize(By byPath) throws FactivaExtractorWebHandlerException {
+		WebElement element = waitForVisibleElement(byPath);
+		int currentHeight = 0, currentWidth = 0;
+		long timeWaitedInMillis = 0;
+		while((element.getSize().getHeight() != currentHeight || element.getSize().getWidth() != currentWidth) 
+				&& timeWaitedInMillis < (MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC * 1000)) {
+			currentHeight = element.getSize().getHeight();
+			currentWidth = element.getSize().getWidth();
+			try { Thread.sleep(200); } catch (InterruptedException e) {}
+			timeWaitedInMillis += 200;
+		}
+		if(timeWaitedInMillis == MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC * 1000) {
+			throw new FactivaExtractorWebHandlerException("waited for element to resize, but did not occur within the max allowed time");
+		}
+	}
+	
+	private WebElement waitForVisibleElement(By byPath) {
 		return new WebDriverWait(driver, MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC).until(ExpectedConditions.visibilityOfElementLocated(byPath));
 	}
 	

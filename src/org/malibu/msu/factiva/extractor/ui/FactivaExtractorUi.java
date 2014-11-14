@@ -93,7 +93,7 @@ public class FactivaExtractorUi {
 	private void initialize() throws IOException {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
-		frmFactivaextractorV.setTitle("FactivaExtractor v1.0");
+		frmFactivaextractorV.setTitle("FactivaExtractor v2.0");
 		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
@@ -288,7 +288,9 @@ public class FactivaExtractorUi {
 					public void stateChanged(FactivaExtractorProgressToken token) {
 						progressBar.setValue(token.getPercentComplete());
 						lblStatusMessage.setText(token.getStatusMessage());
-						MessageHandler.logMessage("(" + token.getPercentComplete() + "%) - " + token.getStatusMessage());
+						if(token.getStatusMessage() != null && token.getStatusMessage().trim().length() != 0) {
+							MessageHandler.logMessage("(" + token.getPercentComplete() + "%) - " + token.getStatusMessage());
+						}
 					}
 				});
 				

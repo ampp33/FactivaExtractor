@@ -15,9 +15,6 @@ public class FilesystemUtil {
 			throw new IOException("source file not valid, make sure it exists and is an actual file");
 		}
 		MessageHandler.logMessage("length of source file before move: " + src.length());
-		if(src.length() < 1000) {
-			System.out.println("oh snap");
-		}
 		// delete destination file before writing to it, if it already exists
 		if(dest.exists()) {
 			dest.delete();

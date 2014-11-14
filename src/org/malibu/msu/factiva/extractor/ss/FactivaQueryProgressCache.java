@@ -28,6 +28,9 @@ public class FactivaQueryProgressCache {
 			// open file in append mode
 			this.outputStream = new FileWriter(cacheFilePath, true);
 		}
+		if(comment == null) {
+			comment = "";
+		}
 		this.outputStream.write(queryId + ":" + queryRow + ":" + isProcessed + ":" + resultCount + ":" + comment + "\n");
 		this.outputStream.flush();
 	}
@@ -48,20 +51,19 @@ public class FactivaQueryProgressCache {
 		if(this.outputStream != null) {
 			this.outputStream.flush();
 			this.outputStream.close();
+			this.outputStream = null;
 		}
 	}
 	
 	public void writeCachedEntriesToSpreadsheet(FactivaQuerySpreadsheetProcessor spreadsheet) throws IOException {
 		// attempt to close cache output stream, if already open, as we'll be
 		// deleting the file afterwards
-		if(this.outputStream != null) {
-			try {
-				close();
-			} catch (IOException e) {}
-		}
+		try {
+			close();
+		} catch (IOException e) {}
+		
 		String line = null;
 		BufferedReader reader = null;
-		
 		try {
 			reader = new BufferedReader(new FileReader(this.cacheFilePath));
 			while((line = reader.readLine()) != null) {

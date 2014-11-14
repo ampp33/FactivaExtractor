@@ -10,7 +10,6 @@ import org.malibu.mail.Email;
 import org.malibu.mail.EmailException;
 import org.malibu.mail.EmailSender;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
-import org.malibu.msu.factiva.extractor.exception.FactivaExtractorFatalException;
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQueryProgressCache;
@@ -81,8 +80,8 @@ public class FactivaExtractorThread implements Runnable {
 			reportExceptionToUi("Error occurred initializing Firefox automation object", 0, e);
 			return;
 		}
+		this.progressToken.setStatusMessage("Attempting to get to Factiva");
 		try {
-			this.progressToken.setStatusMessage("Attempting to get to Factiva");
 			handler.getToFactivaLoginPage();
 			if(!this.skipLogin) {
 				this.progressToken.setStatusMessage("Attempting to log in");
@@ -113,34 +112,31 @@ public class FactivaExtractorThread implements Runnable {
 			}
 			
 			// where the magic BEGINS
+			boolean success = false;
+			int resultCount = 0;
+			String message = null;
 			try {
 				if(!cleanupDownloadDirectory()) {
 					MessageHandler.logMessage("failed to cleanup temp download dir, halting processing...");
 					break;
 				}
-				int resultCount = handler.executeQuery(query);
-				progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), true, resultCount, "");
+				resultCount = handler.executeQuery(query);
 				this.progressToken.setStatusMessage("Query '" + query.getId() + "' processed successfully!");
-				this.progressToken.setPercentComplete((++queriesProcessed * 100) / pendingQueries.size());
-			} catch (FactivaExtractorFatalException fex) {
-				String errorMessage = "FATAL error occurred during search: " + fex.getMessage();
-				try {
-					progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), false, 0, errorMessage);
-				} catch (Exception e1) {
-					reportExceptionToUi("Failed to write to progress cache!  Exiting...", 0, e1);
-					return;
-				}
-				MessageHandler.logMessage(errorMessage);
+				success = true;
 			} catch (Exception e) {
-				String errorMessage = "Error occurred during search: " + e.getMessage();
+				message = "Error occurred during search: " + e.getMessage();
+			} finally {
 				try {
-					progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), false, 0, errorMessage);
+					progressCache.cacheFactivaQueryProgress(query.getId(), query.getQueryRowNumber(), success, resultCount, message);
 				} catch (Exception e1) {
 					reportExceptionToUi("Failed to write to progress cache!  Exiting...", 0, e1);
 					return;
 				}
-				MessageHandler.logMessage(errorMessage);
+				if(message != null) {
+					MessageHandler.logMessage(message);
+				}
 			}
+			this.progressToken.setPercentComplete((++queriesProcessed * 100) / pendingQueries.size());
 			
 			// see if we want to pause in between queries, to act more "human"
 			if(enablePausing) {

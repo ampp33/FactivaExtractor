@@ -175,7 +175,7 @@ public class FactivaWebHandler {
 		// submit search
 		try {
 			WebElement searchSubmitButton = driver.findElement(By.xpath("//input[@type='submit']"));
-			searchSubmitButton.click();
+			click(searchSubmitButton);
 		} catch (Exception e) {
 			throw new FactivaExtractorQueryException("Failed click search 'submit' button", e);
 		}
@@ -185,33 +185,20 @@ public class FactivaWebHandler {
 		try {
 			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
 			WebElement selectAllCheckbox = waitForVisibleElement(By.xpath("//span[@id='selectAll']/input"));
-			selectAllCheckbox.click();
+			click(selectAllCheckbox);
 		} catch (ElementNotFoundException | NoSuchElementException enf) {
 			return 0;
 		} catch (Exception e) {
 			throw new FactivaExtractorQueryException("unexpected exception occurred when trying to click 'select all' checkbox before downloading files", e);
 		}
 		
-		waitForPageToFullyLoad();
-		int numberOfArticlesDownloaded = -1;
-		try {
-			// click file download button, if available
-			WebElement downloadAsRtfButton = waitForVisibleElement(By.xpath("//li[contains(@class,'ppsrtf')]/a"));
-			downloadAsRtfButton.click();
-			// wait for option dropdown to fully load
-			waitForElementToResize(By.id("listMenu-id-3"));
-			WebElement downloadArticleLink = waitForVisibleElement(By.xpath("//li[contains(@class,'ppsrtf')]//a[text()='Article Format']"));
-			downloadArticleLink.click();
-		} catch (Exception e) {
-			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
-		}
-		
 		// attempt to determine number of articles found
+		int numberOfArticlesDownloaded = -1;
 		try {
 			WebElement headlineCountTextArea = driver.findElement(By.xpath("//span[@class='resultsBar']"));
 			String headlineCountText = headlineCountTextArea.getText(); // will always be of format: Headlines 1 - 5 of 6
-//			WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
-//			String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
+//					WebElement duplicateCountTextArea = driver.findElement(By.xpath("//span[@id='dedupSummary']/text()"));
+//					String duplicateCountText = duplicateCountTextArea.getText(); // will always be of format: Total duplicates: 1
 			
 			if(headlineCountText != null) {
 				String[] textSections = headlineCountText.split(" ");
@@ -224,6 +211,20 @@ public class FactivaWebHandler {
 		} catch (Exception e) {
 			// non fatal error
 			MessageHandler.logMessage("Failed to determine number of results returned");
+		}
+		
+		// throw an error if more than 100 articles found, as currently we will only download the first 100,
+		// so this query will need to be processed manually
+		if(numberOfArticlesDownloaded >= 100) {
+			throw new FactivaExtractorQueryException("more than 100 articles found for this query, must be processed manually");
+		}
+		
+		waitForPageToFullyLoad();
+		try {
+			// NOTE: skip clicking the RTF button, it just seems to cause problems, just click the invisible download button via js
+			clickViaJavascriptAndXpath("//li[contains(@class,'ppsrtf')]//a[text()='Article Format']");
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("Failed to click link to download results", e);
 		}
 		
 		convertDownloadedRtfFileToTxt(query);
@@ -240,6 +241,10 @@ public class FactivaWebHandler {
 	private boolean isFileDownloadInProgress() {
 		// if .part file still exists in download directory, wait for it to go away (wait 3 minutes max)
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
+		if(downloadedFiles.length == 0) {
+			// we expect a download to be in progress, but there are no files yet!  lets wait for one to show up!
+			return true;
+		}
 		for (File file : downloadedFiles) {
 			if(file != null && file.getName().endsWith(".part")) {
 				return true;
@@ -474,6 +479,21 @@ public class FactivaWebHandler {
 		return new WebDriverWait(driver, MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC).until(ExpectedConditions.visibilityOfElementLocated(byPath));
 	}
 	
+	private void click(WebElement element) {
+		if(element != null) {
+			// click body of the page to insure that the browser has focus
+			driver.findElement(By.tagName("body")).click();
+			// click element after focus is gained
+			element.click();
+		}
+	}
+	
+	private void clickViaJavascriptAndXpath(String xPath) {
+		if(xPath != null) {
+			((JavascriptExecutor)driver).executeScript("document.evaluate(\"" + xPath + "\", document, null, XPathResult.FIRST_ORDERED_NODE_TYPE, null).singleNodeValue.click();");
+		}
+	}
+	
 	// UPDATE TO SAVE TO A SPECIFIC DIRECTORY ALWAYS, AND _MOVE_ THE FILE AFTER THE DOWNLOAD IS DONE.  GLORIOUS, THOUGH,
 	// HOW DO I VERIFY THE DOWNLOAD IS ACTUALLY DONE??
 	private void updateFirefoxFileDownloadProperties(FirefoxProfile profile, String tempDownloadsDirectory) {
@@ -487,10 +507,10 @@ public class FactivaWebHandler {
 		try {
 			// look for 'All Publications' filter that we want to remove
 			WebElement element = driver.findElement(By.xpath("//*[@id='scLst']/div/ul/li[1]/div"));
-			element.click();
+			click(element);
 			// click 'remove'
 			WebElement removeButton = driver.findElement(By.xpath("//*[@class='pillOption remove']"));
-			removeButton.click();
+			click(removeButton);
 		} catch (Exception e) {
 			throw new FactivaExtractorWebHandlerException("unable to remove 'All Publications' filter", e);
 		}

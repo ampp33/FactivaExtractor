@@ -93,7 +93,7 @@ public class FactivaExtractorUi {
 	private void initialize() throws IOException {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
-		frmFactivaextractorV.setTitle("FactivaExtractor v2.0");
+		frmFactivaextractorV.setTitle("FactivaExtractor v2.1");
 		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);

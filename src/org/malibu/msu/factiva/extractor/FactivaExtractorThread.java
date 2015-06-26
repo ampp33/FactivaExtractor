@@ -14,6 +14,7 @@ import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerExce
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQueryProgressCache;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
+import org.malibu.msu.factiva.extractor.ui.FactivaExtractorProgressToken;
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
 import org.malibu.msu.factiva.extractor.util.Constants;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandler;

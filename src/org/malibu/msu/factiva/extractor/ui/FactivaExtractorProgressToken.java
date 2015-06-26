@@ -1,4 +1,4 @@
-package org.malibu.msu.factiva.extractor;
+package org.malibu.msu.factiva.extractor.ui;
 
 import org.malibu.msu.factiva.extractor.ui.listener.FactivaExtractorProgressListener;
 

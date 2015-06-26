@@ -9,6 +9,7 @@ import org.malibu.msu.factiva.extractor.exception.FactivaExtractorQueryException
 import org.malibu.msu.factiva.extractor.exception.FactivaExtractorWebHandlerException;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.ss.FactivaQuerySpreadsheetProcessor;
+import org.malibu.msu.factiva.extractor.ui.FactivaExtractorProgressToken;
 import org.malibu.msu.factiva.extractor.ui.MessageHandler;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandler;
 import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;

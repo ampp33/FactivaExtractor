@@ -8,6 +8,8 @@ import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.apache.poi.hssf.usermodel.HSSFDateUtil;
 import org.apache.poi.ss.usermodel.Cell;
@@ -22,6 +24,7 @@ import org.apache.poi.ss.usermodel.WorkbookFactory;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
 import org.malibu.msu.factiva.extractor.exception.FactivaSpreadsheetException;
 import org.malibu.msu.factiva.extractor.util.FilesystemUtil;
+import org.malibu.msu.factiva.extractor.util.StringUtil;
 
 public class FactivaQuerySpreadsheetProcessor {
 	
@@ -166,50 +169,58 @@ public class FactivaQuerySpreadsheetProcessor {
 	public List<String> validateQueries(List<FactivaQuery> queries, boolean throwExceptions) throws FactivaSpreadsheetException {
 		List<String> errorMessages = new ArrayList<>();
 		if(queries != null) {
-			List<String> knownIds = new ArrayList<>();
+			Set<String> knownIds = new TreeSet<>();
 			for (FactivaQuery query : queries) {
+				
 				if(query == null) {
 					addOrThrowError("null query detected", errorMessages, throwExceptions);
 					return errorMessages;
 				}
+				
 				if(query.getId() == null) {
 					addOrThrowError("query at row " + query.getQueryRowNumber() + " has no ID", errorMessages, throwExceptions);
 				}
+				
 				// verify there aren't duplicate IDs
-				boolean idAlreadyUsed = false;
-				for(String id : knownIds) {
-					if(query.getId().equals(id)) {
-						addOrThrowError("query at row " + query.getQueryRowNumber()
-								+ " has has an ID ('" + id + "') that has already been used, duplicate IDs are not allowed", errorMessages, throwExceptions);
-						idAlreadyUsed = true;
-					}
-				}
-				if(!idAlreadyUsed) {
+				if(knownIds.contains(query.getId())) {
+					addOrThrowError("query at row " + query.getQueryRowNumber()
+							+ " has has an ID ('" + query.getId() + "') that has already been used, duplicate IDs are not allowed", errorMessages, throwExceptions);
+				} else {
 					knownIds.add(query.getId());
 				}
+				
 				if(!FilesystemUtil.isValidFileName(query.getId())) {
 					addOrThrowError("query at row " + query.getQueryRowNumber() + " has an ID that won't translate to an acceptable filename", errorMessages, throwExceptions);
 				}
+				
 				String errorMessagePrefix = "query '" + query.getId() + "' at row " + (query.getQueryRowNumber() + 1);
+				
 				if(query.getSources() == null || query.getSources().size() == 0) {
 					addOrThrowError(errorMessagePrefix + " has no sources", errorMessages, throwExceptions);
 				}
-				if(query.getCompanyName() == null || query.getCompanyName().trim().length() == 0) {
+				
+				if(StringUtil.isEmpty(query.getCompanyName())) {
 					addOrThrowError(errorMessagePrefix + " has no company name", errorMessages, throwExceptions);
 				}
-				if((query.getSubjects() == null || query.getSubjects().size() == 0) && (query.getSearchText() == null || query.getSearchText().trim().length() == 0)) {
-					addOrThrowError(errorMessagePrefix + " has no subjects or search text", errorMessages, throwExceptions);
-				}
+				
+				// removed per Danny's request on 2015/06/03
+//				if((query.getSubjects() == null || query.getSubjects().size() == 0) && StringUtil.isEmpty(query.getSearchText())) {
+//					addOrThrowError(errorMessagePrefix + " has no subjects or search text", errorMessages, throwExceptions);
+//				}
+				
 				if(query.getDateRangeFrom() == null) {
 					addOrThrowError(errorMessagePrefix + " has no start date, or has an invalid value", errorMessages, throwExceptions);
 				}
+				
 				if(query.getDateRangeTo() == null) {
 					addOrThrowError(errorMessagePrefix + " has no end date, or has an invalid value", errorMessages, throwExceptions);
 				}
+				
 				if(query.getDateRangeFrom() != null && query.getDateRangeTo() != null 
 						&& (query.getDateRangeFrom().getTime() > query.getDateRangeTo().getTime())) {
 					addOrThrowError(errorMessagePrefix + " has a start date later than the end date", errorMessages, throwExceptions);
 				}
+				
 			}
 		}
 		return errorMessages;

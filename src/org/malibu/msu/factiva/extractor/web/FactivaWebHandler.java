@@ -459,22 +459,6 @@ public class FactivaWebHandler {
         });
 	}
 	
-	private void waitForElementToResize(By byPath) throws FactivaExtractorWebHandlerException {
-		WebElement element = waitForVisibleElement(byPath);
-		int currentHeight = 0, currentWidth = 0;
-		long timeWaitedInMillis = 0;
-		while((element.getSize().getHeight() != currentHeight || element.getSize().getWidth() != currentWidth) 
-				&& timeWaitedInMillis < (MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC * 1000)) {
-			currentHeight = element.getSize().getHeight();
-			currentWidth = element.getSize().getWidth();
-			try { Thread.sleep(200); } catch (InterruptedException e) {}
-			timeWaitedInMillis += 200;
-		}
-		if(timeWaitedInMillis == MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC * 1000) {
-			throw new FactivaExtractorWebHandlerException("waited for element to resize, but did not occur within the max allowed time");
-		}
-	}
-	
 	private WebElement waitForVisibleElement(By byPath) {
 		return new WebDriverWait(driver, MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC).until(ExpectedConditions.visibilityOfElementLocated(byPath));
 	}

@@ -35,7 +35,6 @@ import javax.swing.text.DefaultCaret;
 
 import org.malibu.mail.Email;
 import org.malibu.mail.EmailSender;
-import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
 import org.malibu.msu.factiva.extractor.FactivaExtractorThread;
 import org.malibu.msu.factiva.extractor.FactivaKeywordValidatorThread;
 import org.malibu.msu.factiva.extractor.beans.FactivaQuery;
@@ -96,7 +95,7 @@ public class FactivaExtractorUi {
 	private void initialize() throws IOException {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
-		frmFactivaextractorV.setTitle("FactivaExtractor v2.1");
+		frmFactivaextractorV.setTitle("FactivaExtractor v2.3");
 		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
@@ -570,6 +569,7 @@ public class FactivaExtractorUi {
 		panel.add(lblPassword);
 
 		JPasswordField textFieldPassword = new JPasswordField(System.getProperty("PASSWORD"));
+		config.setPassword(textFieldPassword.getText());
 		textFieldPassword.setBounds(328, 142, 151, 22);
 		textFieldPassword.getDocument().addDocumentListener(new JTextFieldChangeListener(textFieldPassword) {
 			public void onChange(String newText) {
@@ -587,6 +587,7 @@ public class FactivaExtractorUi {
 		panel.add(lblUsername);
 
 		JTextField textFieldUsername = new JTextField(System.getProperty("USERNAME"));
+		config.setUsername(textFieldUsername.getText());
 		textFieldUsername.setBounds(328, 118, 151, 22);
 		textFieldUsername.getDocument().addDocumentListener(new JTextFieldChangeListener(textFieldUsername) {
 			public void onChange(String newText) {

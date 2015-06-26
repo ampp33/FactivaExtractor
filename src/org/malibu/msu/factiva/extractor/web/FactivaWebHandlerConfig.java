@@ -1,6 +1,6 @@
 package org.malibu.msu.factiva.extractor.web;
 
-import org.malibu.msu.factiva.extractor.FactivaExtractorProgressToken;
+import org.malibu.msu.factiva.extractor.ui.FactivaExtractorProgressToken;
 
 public class FactivaWebHandlerConfig {
 	private String username = null;

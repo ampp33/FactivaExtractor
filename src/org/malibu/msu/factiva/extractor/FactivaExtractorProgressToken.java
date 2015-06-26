@@ -1,5 +1,7 @@
 package org.malibu.msu.factiva.extractor;
 
+import org.malibu.msu.factiva.extractor.ui.listener.FactivaExtractorProgressListener;
+
 public class FactivaExtractorProgressToken {
 	private FactivaExtractorProgressListener listener = null;
 	private String statusMessage = null;

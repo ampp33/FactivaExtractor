@@ -12,6 +12,7 @@ public class FactivaWebHandlerConfig {
 	private String tempDownloadDirPath = null;
 	private String destinationDirPath = null;
 	private String firefoxProfileDirPath = null;
+	private boolean spreadsheetVerified;
 	private FactivaExtractorProgressToken progressToken = null;
 	
 	public String getUsername() {
@@ -73,5 +74,11 @@ public class FactivaWebHandlerConfig {
 	}
 	public void setProgressToken(FactivaExtractorProgressToken progressToken) {
 		this.progressToken = progressToken;
+	}
+	public boolean isSpreadsheetVerified() {
+		return spreadsheetVerified;
+	}
+	public void setSpreadsheetVerified(boolean spreadsheetVerified) {
+		this.spreadsheetVerified = spreadsheetVerified;
 	}
 }

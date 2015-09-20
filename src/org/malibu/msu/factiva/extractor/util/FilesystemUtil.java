@@ -10,6 +10,10 @@ import org.malibu.msu.factiva.extractor.ui.MessageHandler;
 public class FilesystemUtil {
 	
 	public static final void moveFile(File src, File dest) throws IOException {
+		copyFile(src, dest, true);
+	}
+	
+	public static final void copyFile(File src, File dest, boolean deleteAfter) throws IOException {
 		// verify source file exists
 		if(src == null || !src.exists() || !src.isFile()) {
 			throw new IOException("source file not valid, make sure it exists and is an actual file");
@@ -29,8 +33,10 @@ public class FilesystemUtil {
 		destStream.flush();
 		destStream.close();
 		srcStream.close();
-		if(!src.delete()) {
-			throw new IOException("failed to remove source file");
+		if(deleteAfter) {
+			if(!src.delete()) {
+				throw new IOException("failed to remove source file");
+			}
 		}
 	}
 	

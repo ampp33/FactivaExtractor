@@ -112,7 +112,7 @@ public class FactivaWebHandler {
 		try {
 			WebElement usernameElement = driver.findElement(By.id("msu-id"));
 			WebElement passwordElement = driver.findElement(By.id("password"));
-			WebElement loginButton = driver.findElement(By.id("login-submit"));
+			WebElement loginButton = driver.findElement(By.className("msuit_brand_submit"));
 			usernameElement.sendKeys(username);
 			passwordElement.sendKeys(password);
 			loginButton.click();
@@ -182,8 +182,19 @@ public class FactivaWebHandler {
 		
 		// download results to a file
 		waitForPageToFullyLoad();
+		
+		// check if there were no results, and if so, don't error, but return
 		try {
-			// TODO: what happens when there are multiple pages and we click the select all checkbox?  does it grab all of them??
+			WebElement headlineCountTextArea = driver.findElement(By.xpath("//div[@id='headlines']"));
+			String headlineCountText = headlineCountTextArea.getText(); // may say "No search results"
+	
+			if(headlineCountText != null && headlineCountText.contains("No search results")) {
+				MessageHandler.logMessage("0 search results found for query, moving on...");
+				return 0;
+			}
+		} catch (Exception ex) {}
+		
+		try {
 			WebElement selectAllCheckbox = waitForVisibleElement(By.xpath("//span[@id='selectAll']/input"));
 			click(selectAllCheckbox);
 		} catch (ElementNotFoundException | NoSuchElementException enf) {
@@ -281,12 +292,15 @@ public class FactivaWebHandler {
 		// check that only one file exists in the download directory
 		File[] downloadedFiles = new File(this.tempDownloadsDirectory).listFiles();
 		if(downloadedFiles == null || downloadedFiles.length != 1) {
-			throw new FactivaExtractorQueryException("unexpected contents in temp download directory");
+			throw new FactivaExtractorQueryException("unexpected contents in temp download directory (more than one file in download dir)");
 		}
 		
 		String downloadRtfFileAbsPath = downloadedFiles[0].getAbsolutePath();
 		String downloadTxtFileAbsPath = downloadedFiles[0].getAbsoluteFile().getParentFile().getAbsolutePath() + Constants.FILE_SEPARATOR + query.getId() + ".txt";
 		File downloadTxtFile = new File(downloadTxtFileAbsPath);
+		
+		long timeWaitedForNonEmptyFile = waitForNonEmpty(new File(downloadRtfFileAbsPath));
+		MessageHandler.logMessage("had to wait " + timeWaitedForNonEmptyFile + " ms for non-empty file");
 		
 		// convert rtf file to txt
 		FileInputStream rtfInputStream = null;
@@ -358,7 +372,7 @@ public class FactivaWebHandler {
 				WebElement fromMonthTextArea = driver.findElement(By.id("ftx"));
 				fromMonthTextArea.sendKeys(query.getSearchText());
 			} catch (Exception e) {
-				throw new FactivaExtractorQueryException("Failed to set search text", e);
+				throw new FactivaExtractorQueryException("failed to set search text", e);
 			}
 		}
 		if (query.getSubjects() != null && query.getSubjects().size() > 0) {
@@ -446,6 +460,24 @@ public class FactivaWebHandler {
 			}
 			if(!file.canWrite()) {
 				throw new IOException("timed out waiting for filesystem to refresh file: " + file.getAbsolutePath());
+			}
+		}
+		return timeWaited;
+	}
+	
+	/**
+	 * Waits for non-empty file
+	 * @throws IOException 
+	 */
+	private long waitForNonEmpty(File file) throws IOException {
+		long timeWaited = 0;
+		if(file != null) {
+			while(file.length() <= 2 && timeWaited < MAX_TIME_TO_WAIT_FOR_FS_IN_MS) {
+				try { Thread.sleep(500); } catch (InterruptedException e) {}
+				timeWaited += 500;
+			}
+			if(!file.canWrite()) {
+				throw new IOException("timed out waiting for non-empty file (waiting for filesystem): " + file.getAbsolutePath());
 			}
 		}
 		return timeWaited;

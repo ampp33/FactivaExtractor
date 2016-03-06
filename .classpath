@@ -3,10 +3,10 @@
 	<classpathentry kind="src" path="src"/>
 	<classpathentry kind="src" path="test"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/selenium-2.45.0"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/email"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/poi-3.10"/>
 	<classpathentry kind="lib" path="lib/EmailUtilities.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.13.jar"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/selenium-2.48.2"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/poi-3.13"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/email"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

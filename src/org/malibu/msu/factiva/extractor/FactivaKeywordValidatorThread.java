@@ -101,7 +101,7 @@ public class FactivaKeywordValidatorThread implements Runnable {
 			handler.getToFactivaLoginPage();
 			if(!this.skipLogin) {
 				this.progressToken.setStatusMessage("Attempting to log in");
-				handler.login(this.username, this.password);
+				handler.secondLogin(this.username, this.password);
 				this.progressToken.setStatusMessage("Successfully logged in");
 			}
 		} catch (Exception e) {
@@ -122,13 +122,6 @@ public class FactivaKeywordValidatorThread implements Runnable {
 		
 		// verify sources
 		this.progressToken.setStatusMessage("Verifying source filters (" + sourceFilters.size() + ")");
-		try {
-			MessageHandler.logMessage("Attempting to remove initial 'All Publications' source filter");
-			handler.removeAllPublicationsFilter();
-		} catch (FactivaExtractorWebHandlerException e) {
-			reportExceptionToUi("Failed to remove initial 'All Publications' source filter, exiting...", 100, e);
-			return;
-		}
 		for (String source : sourceFilters) {
 			try {
 				MessageHandler.logMessage("Verifying source '" + source + "'");

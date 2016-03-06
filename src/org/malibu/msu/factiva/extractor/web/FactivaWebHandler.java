@@ -34,8 +34,7 @@ import com.google.common.base.Predicate;
 
 public class FactivaWebHandler {
 	
-//	private static final String LOGIN_URL = "https://login.msu.edu?App=ATS_Shibboleth_IdP_Idm";
-	private static final String GET_TO_FACTIVA_URL = "http://er.lib.msu.edu/notice.cfm?dblistno=008462";
+	private static final String GET_TO_FACTIVA_URL = "http://www.libs.uga.edu/research/portal_browse.php?key=F";
 	
 	private static final int MAX_DOWNLOAD_WAIT_TIME = 180000;
 	private static final int MAX_TIME_TO_WAIT_FOR_WEB_ELEMENTS_IN_SEC = 5;
@@ -100,24 +99,55 @@ public class FactivaWebHandler {
 		} catch (Exception t) {
 			throw new FactivaExtractorWebHandlerException("failed to load starting point web page");
 		}
+		
 		try {
-			WebElement factivaLink = driver.findElement(By.xpath("//*[@id=\"maincontainer\"]/h4[5]/a"));
+			WebElement factivaLink = driver.findElement(By.xpath("//a[text()='Factiva']"));
 			factivaLink.click();
 		} catch (ElementNotFoundException | NoSuchElementException ex) {
 			throw new FactivaExtractorWebHandlerException("unable to find factiva login page link");
 		}
+		
+//		// verify a new window was opened
+//		if(driver.getWindowHandles().size() != 2) {
+//			throw new FactivaExtractorWebHandlerException("failed to open second browser window for login");
+//		}
+//		// close the old window
+//		driver.close();
+//		// switch to the new window
+//		for (String windowHandle : driver.getWindowHandles()) {
+//			driver.switchTo().window(windowHandle);
+//		}
 	}
 	
-	public void login(String username, String password) throws FactivaExtractorWebHandlerException {
+	public void firstLogin(String username, String password) throws FactivaExtractorWebHandlerException {
 		try {
-			WebElement usernameElement = driver.findElement(By.id("msu-id"));
-			WebElement passwordElement = driver.findElement(By.id("password"));
-			WebElement loginButton = driver.findElement(By.className("msuit_brand_submit"));
+			WebElement usernameElement = driver.findElement(By.xpath("//*[@id='username']"));
+			WebElement passwordElement = driver.findElement(By.xpath("//*[@id='password']"));
+			WebElement loginButton = driver.findElement(By.xpath("//input[@type='submit']"));
 			usernameElement.sendKeys(username);
 			passwordElement.sendKeys(password);
-			loginButton.click();
+			
+			// click button via JS, because this page sucks
+			JavascriptExecutor executor = (JavascriptExecutor) driver;
+			executor.executeScript("arguments[0].click();", loginButton);
 		} catch (ElementNotFoundException | NoSuchElementException ex) {
-			throw new FactivaExtractorWebHandlerException("unable to find login fields or button");
+			throw new FactivaExtractorWebHandlerException("unable to find first login page fields or button");
+		}
+	}
+	
+	public void secondLogin(String username, String password) throws FactivaExtractorWebHandlerException {
+		try {
+			WebElement usernameElement = driver.findElement(By.xpath("//form[@name='ProxyAuth']/input[@name='user']"));
+			WebElement passwordElement = driver.findElement(By.xpath("//form[@name='ProxyAuth']/input[@name='pass']"));
+			WebElement loginButton = driver.findElement(By.xpath("//form[@name='ProxyAuth']/input[@type='submit']"));
+			usernameElement.sendKeys(username);
+			passwordElement.sendKeys(password);
+			
+			// click button via JS, because this page sucks
+			JavascriptExecutor executor = (JavascriptExecutor) driver;
+			executor.executeScript("arguments[0].click();", loginButton);
+		} catch (ElementNotFoundException | NoSuchElementException ex) {
+			throw new FactivaExtractorWebHandlerException("unable to find second login fields or button");
 		}
 		
 		// wait for factiva login page to load (wait a max of 20 seconds)
@@ -170,6 +200,7 @@ public class FactivaWebHandler {
 	
 	public int executeQuery(FactivaQuery query) throws FactivaExtractorQueryException, FactivaExtractorWebHandlerException, IOException {
 		waitForPageToFullyLoad();
+		disableQueryGenius();
 		updateSearchPageFields(query);
 		
 		// submit search
@@ -196,7 +227,7 @@ public class FactivaWebHandler {
 		
 		try {
 			WebElement selectAllCheckbox = waitForVisibleElement(By.xpath("//span[@id='selectAll']/input"));
-			click(selectAllCheckbox);
+			selectAllCheckbox.click();
 		} catch (ElementNotFoundException | NoSuchElementException enf) {
 			return 0;
 		} catch (Exception e) {
@@ -348,10 +379,29 @@ public class FactivaWebHandler {
 		String finalFileName = downloadTxtFile.getName();
 		FilesystemUtil.moveFile(downloadTxtFile, new File(this.downloadDestinationDirectory + finalFileName));
 	}
+	
+	private void disableQueryGenius() throws FactivaExtractorQueryException {
+		try {
+			// check for query genius switch in an enabled state
+			driver.findElement(By.xpath("//*[@id='switchbutton' and contains(@class,'ui-state-active')]"));
+		} catch (Exception ex) {
+			// not enabled, don't have to click it to disable it!
+			return;
+		}
+		try {
+			// wasn't able to find the query genius switch in a disabled status, so click it to disable it
+			WebElement queryGeniusSwitch = driver.findElement(By.xpath("//*[contains(@class,'ui-switchbutton-handle')]"));
+			queryGeniusSwitch.click();
+		} catch (Exception e) {
+			throw new FactivaExtractorQueryException("failed to disable query genius", e);
+		}
+	}
 
 	private void updateSearchPageFields(FactivaQuery query) throws FactivaExtractorWebHandlerException, FactivaExtractorQueryException {
+		if(query.isRemoveAllPublicationsFilter()) {
+			removeAllPublicationsFilter();
+		}
 		// set sources
-		removeAllPublicationsFilter();
 		try {
 			inputFieldsInExpandableSection("scTab", "scTxt", query.getSources());
 		} catch (FactivaExtractorWebHandlerException e) {
@@ -545,7 +595,6 @@ public class FactivaWebHandler {
 			
 			// input search string
 			try {
-				
 				// enter text via javascript to avoid funky issue caused by jQuery, where ampersands weren't being entered
 				JavascriptExecutor jsExec = (JavascriptExecutor)this.driver;
 				jsExec.executeScript("document.getElementById('" + inputElementId + "').value = \"" + searchString + "\";");
@@ -556,38 +605,86 @@ public class FactivaWebHandler {
 			} catch (Exception e) {
 				throw new FactivaExtractorWebHandlerException("unable to enter text in autocomplete text area (HTML element ID: '" + inputElementId + "')");
 			}
-			// click first autocomplete item
+			// click autocomplete item that matches the search text EXACTLY
 			try {
-				WebElement firstAutocompleteItem = waitForElementByXPath("//div[@class='dj_emg_autosuggest_results scResultPopup'][last()]/table/tbody/tr/td[1]", 4000);
-				firstAutocompleteItem.click();
+				List<WebElement> autocompleteItems = waitForElementsByXPath("//div[@class='dj_emg_autosuggest_results scResultPopup'][last()]/table/tbody/tr/td", 4000);
+				boolean itemFound = false;
+				for (WebElement item : autocompleteItems) {
+					String itemText = item.getText();
+					String[] textTokens = itemText.split("\n");
+					for (String token : textTokens) {
+						if(searchString.equals(token)) {
+							itemFound = true;
+							item.click();
+						}
+					}
+				}
+				if(!itemFound) {
+					throw new Exception("didn't find any autocomplete items that matched the specified text exactly");
+				}
 			} catch (Exception e) {
 				throw new FactivaExtractorWebHandlerException("unable to find and click an autocomplete dropdown item");
 			}
 		}
 	}
 	
-	private WebElement waitForElementByXPath(String xpath, int maxTimeInMilliseconds) throws FactivaExtractorWebHandlerException {
-		WebElement element = null;
+//	private WebElement waitForElementByXPath(String xpath, int maxTimeInMilliseconds) throws FactivaExtractorWebHandlerException {
+//		WebElement element = null;
+//		
+//		boolean elementLoaded = false;
+//		int waitTime = 0;
+//		while(!elementLoaded && waitTime < maxTimeInMilliseconds) {
+//			// wait half a second
+//			try { Thread.sleep(500); } catch (InterruptedException e) {}
+//			waitTime += 500;
+//			
+//			try {
+//				// look for element
+//				element = driver.findElement(By.xpath(xpath));
+//				if(element != null && element.isDisplayed()) {
+//					elementLoaded = true;
+//				}
+//			} catch (Exception e) {}
+//		}
+//		
+//		// check that we were able to find the element
+//		if(elementLoaded) {
+//			return element;
+//		} else {
+//			throw new FactivaExtractorWebHandlerException("waited for element '" + xpath + "' for " + maxTimeInMilliseconds + " milliseconds, but it never appeared");
+//		}
+//	}
+	
+	private List<WebElement> waitForElementsByXPath(String xpath, int maxTimeInMilliseconds) throws FactivaExtractorWebHandlerException {
+		List<WebElement> elements = null;
 		
-		boolean elementLoaded = false;
+		boolean elementsLoaded = false;
 		int waitTime = 0;
-		while(!elementLoaded && waitTime < maxTimeInMilliseconds) {
+		while(!elementsLoaded && waitTime < maxTimeInMilliseconds) {
 			// wait half a second
 			try { Thread.sleep(500); } catch (InterruptedException e) {}
 			waitTime += 500;
 			
 			try {
 				// look for element
-				element = driver.findElement(By.xpath(xpath));
-				if(element != null && element.isDisplayed()) {
-					elementLoaded = true;
+				elements = driver.findElements(By.xpath(xpath));
+				if(elements != null) {
+					boolean atLeastOneDisplayed = false;
+					boolean allDisplayed = true;
+					for (WebElement webElement : elements) {
+						allDisplayed &= webElement.isDisplayed();
+						atLeastOneDisplayed |= webElement.isDisplayed();
+					}
+					if(atLeastOneDisplayed && allDisplayed) {
+						elementsLoaded = true;
+					}
 				}
 			} catch (Exception e) {}
 		}
 		
 		// check that we were able to find the element
-		if(elementLoaded) {
-			return element;
+		if(elementsLoaded) {
+			return elements;
 		} else {
 			throw new FactivaExtractorWebHandlerException("waited for element '" + xpath + "' for " + maxTimeInMilliseconds + " milliseconds, but it never appeared");
 		}

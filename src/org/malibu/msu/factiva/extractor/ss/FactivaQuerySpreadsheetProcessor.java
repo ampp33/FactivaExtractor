@@ -153,7 +153,11 @@ public class FactivaQuerySpreadsheetProcessor {
 			}
 			String isProcessedString = getCellValueAsString(evaluator, currentRow.getCell(PROCESSED_COLUMN_INDEX));
 			boolean isProcessed = isProcessedString == null ? false : "X".equals(isProcessedString);
-			currentQuery.setProcessed(isProcessed);
+			// if statement here is important, as we don't want to set the current query back to
+			// false if the query has more than one row associated with it in the spreadsheet!
+			if(isProcessed) {
+				currentQuery.setProcessed(isProcessed);
+			}
 		}
 		
 		return queries;

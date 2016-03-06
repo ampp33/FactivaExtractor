@@ -6,6 +6,7 @@ public class FactivaWebHandlerConfig {
 	private String username = null;
 	private String password = null;
 	private boolean skipLogin = false;
+	private boolean removeAllPublicationsFilter = true;
 	private String alertEmailAddress = null;
 	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;
@@ -32,6 +33,12 @@ public class FactivaWebHandlerConfig {
 	}
 	public void setSkipLogin(boolean skipLogin) {
 		this.skipLogin = skipLogin;
+	}
+	public boolean isRemoveAllPublicationsFilter() {
+		return removeAllPublicationsFilter;
+	}
+	public void setRemoveAllPublicationsFilter(boolean removeAllPublicationsFilter) {
+		this.removeAllPublicationsFilter = removeAllPublicationsFilter;
 	}
 	public String getAlertEmailAddress() {
 		return alertEmailAddress;

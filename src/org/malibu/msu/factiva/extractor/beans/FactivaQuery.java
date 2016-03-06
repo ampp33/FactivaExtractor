@@ -13,6 +13,7 @@ public class FactivaQuery {
 	private List<String> subjects;
 	private String searchText;
 	private boolean isProcessed = false;
+	private boolean removeAllPublicationsFilter = false;
 	
 	public String getId() {
 		return id;
@@ -61,6 +62,12 @@ public class FactivaQuery {
 	}
 	public void setProcessed(boolean isProcessed) {
 		this.isProcessed = isProcessed;
+	}
+	public boolean isRemoveAllPublicationsFilter() {
+		return removeAllPublicationsFilter;
+	}
+	public void setRemoveAllPublicationsFilter(boolean removeAllPublicationsFilter) {
+		this.removeAllPublicationsFilter = removeAllPublicationsFilter;
 	}
 	public String getSearchText() {
 		return searchText;

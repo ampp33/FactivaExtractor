@@ -12,6 +12,8 @@ import org.malibu.msu.factiva.extractor.util.Constants;
 public class FactivaQueryProgressCache {
 	
 	public static final String CACHE_FILE_NAME = "cache.txt";
+	private static final String SEPARATOR = "||";
+	private static final String REGEX_SAFE_SEPARATOR = "\\|\\|";
 	private String cacheFilePath = null;
 	private FileWriter outputStream = null;
 	
@@ -31,7 +33,7 @@ public class FactivaQueryProgressCache {
 		if(comment == null) {
 			comment = "";
 		}
-		this.outputStream.write(queryId + ":" + queryRow + ":" + isProcessed + ":" + resultCount + ":" + comment + "\n");
+		this.outputStream.write(queryId + SEPARATOR + queryRow + SEPARATOR + isProcessed + SEPARATOR + resultCount + SEPARATOR + comment + System.lineSeparator());
 		this.outputStream.flush();
 	}
 	
@@ -67,7 +69,7 @@ public class FactivaQueryProgressCache {
 		try {
 			reader = new BufferedReader(new FileReader(this.cacheFilePath));
 			while((line = reader.readLine()) != null) {
-				String[] entry = parseEntry(line);
+				String[] entry = line.split(REGEX_SAFE_SEPARATOR, -1);
 				//String queryId = entry[0];
 				int queryLineNo = Integer.parseInt(entry[1]);
 				boolean isProcessed = Boolean.parseBoolean(entry[2]);
@@ -88,19 +90,5 @@ public class FactivaQueryProgressCache {
 				} catch (Exception e) {}
 			}
 		}
-	}
-	
-	private String[] parseEntry(String line) {
-		String[] result = new String[5];
-		// line format:
-		// queryId:queryLineNumber:isProcessed:comment
-		for(int i = 0; i < 4; i++) {
-			int index = line.indexOf(':');
-			result[i] = line.substring(0, index);
-			line = line.substring(index + 1);
-		}
-		result[4] = line;
-		
-		return result;
 	}
 }

@@ -93,7 +93,7 @@ public class MessageHandler {
 		// add info to contact dev team
 		completeMessage.append("\n\n");
 		completeMessage.append("If you want support for this application, \n");
-		completeMessage.append("copy the error text in this message box and email it to: ampp33@gmail.com \n");
+		completeMessage.append("copy the error text in this message box and email it to: kevin.j.kunst@gmail.com \n");
 		showEditablePopupWindow("Exception",completeMessage.toString());
 		logMessage(completeMessage.toString());
 	}

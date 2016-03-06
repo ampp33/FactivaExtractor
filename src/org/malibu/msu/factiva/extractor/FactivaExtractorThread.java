@@ -22,28 +22,12 @@ import org.malibu.msu.factiva.extractor.web.FactivaWebHandlerConfig;
 
 public class FactivaExtractorThread implements Runnable {
 	
-	private String username = null;
-	private String password = null;
-	private boolean skipLogin = false;
-	private String alertEmailAddress = null;
-	private String workingDirPath = null;
-	private String spreadsheetFilePath = null;
-	private String tempDownloadDirPath = null;
-	private String destinationDirPath = null;
-	private String firefoxProfileDirPath = null;
+	private FactivaWebHandlerConfig config = null;
 	private FactivaExtractorProgressToken progressToken = null;
 	
 	
 	public FactivaExtractorThread(FactivaWebHandlerConfig config) {
-		this.username = config.getUsername();
-		this.password = config.getPassword();
-		this.skipLogin = config.isSkipLogin();
-		this.alertEmailAddress = config.getAlertEmailAddress();
-		this.workingDirPath = config.getWorkingDirPath();
-		this.spreadsheetFilePath = config.getSpreadsheetFilePath();
-		this.tempDownloadDirPath = config.getTempDownloadDirPath();
-		this.destinationDirPath = config.getDestinationDirPath();
-		this.firefoxProfileDirPath = config.getFirefoxProfileDirPath();
+		this.config = config;
 		this.progressToken = config.getProgressToken();
 	}
 
@@ -64,8 +48,8 @@ public class FactivaExtractorThread implements Runnable {
 		FactivaQueryProgressCache progressCache = null;
 		List<FactivaQuery> pendingQueries = null;
 		try {
-			progressCache = new FactivaQueryProgressCache(this.workingDirPath);
-			spreadsheet = new FactivaQuerySpreadsheetProcessor(this.spreadsheetFilePath);
+			progressCache = new FactivaQueryProgressCache(config.getWorkingDirPath());
+			spreadsheet = new FactivaQuerySpreadsheetProcessor(config.getSpreadsheetFilePath());
 			pendingQueries = spreadsheet.getQueriesFromSpreadsheet(true);
 		} catch (IOException | FactivaSpreadsheetException e1) {
 			reportExceptionToUi("Error occurred setting up cache or loading queries from spreadsheet before beginning processing", 0, e1);
@@ -76,7 +60,7 @@ public class FactivaExtractorThread implements Runnable {
 		this.progressToken.setStatusMessage("Starting Firefox session...");
 		FactivaWebHandler handler = null;
 		try {
-			handler = new FactivaWebHandler(this.tempDownloadDirPath, this.destinationDirPath, this.firefoxProfileDirPath);
+			handler = new FactivaWebHandler(config.getTempDownloadDirPath(), config.getDestinationDirPath(), config.getFirefoxProfileDirPath());
 		} catch (FactivaExtractorWebHandlerException e) {
 			reportExceptionToUi("Error occurred initializing Firefox automation object", 0, e);
 			return;
@@ -84,14 +68,22 @@ public class FactivaExtractorThread implements Runnable {
 		this.progressToken.setStatusMessage("Attempting to get to Factiva");
 		try {
 			handler.getToFactivaLoginPage();
-			if(!this.skipLogin) {
+			if(!config.isSkipLogin()) {
 				this.progressToken.setStatusMessage("Attempting to log in");
-				handler.login(this.username, this.password);
+				handler.firstLogin(config.getUsername(), config.getPassword());
+				handler.secondLogin(config.getUsername(), config.getPassword());
 				this.progressToken.setStatusMessage("Successfully logged in");
 			}
 		} catch (Exception e) {
 			reportExceptionToUi("Error occurred starting Factiva", 0, e);
 			return;
+		}
+		
+		int numQueriesToProcess = 0;
+		for (FactivaQuery query : pendingQueries) {
+			if(!query.isProcessed()) {
+				numQueriesToProcess++;
+			}
 		}
 		
 		// run searches
@@ -101,6 +93,9 @@ public class FactivaExtractorThread implements Runnable {
 			if(query.isProcessed()) {
 				continue;
 			}
+			
+			// update query to skip removing all publications filter, if set in the config
+			query.setRemoveAllPublicationsFilter(config.isRemoveAllPublicationsFilter());
 			
 			this.progressToken.setStatusMessage("Processing query '" + query.getId() + "'...");
 			
@@ -137,7 +132,7 @@ public class FactivaExtractorThread implements Runnable {
 					MessageHandler.logMessage(message);
 				}
 			}
-			this.progressToken.setPercentComplete((++queriesProcessed * 100) / pendingQueries.size());
+			this.progressToken.setPercentComplete((++queriesProcessed * 100) / numQueriesToProcess);
 			
 			// see if we want to pause in between queries, to act more "human"
 			if(enablePausing) {
@@ -184,7 +179,7 @@ public class FactivaExtractorThread implements Runnable {
 		handler.closeWebWindow();
 		
 		// attempt to send completion email
-		if(this.alertEmailAddress != null) {
+		if(config.getAlertEmailAddress() != null) {
 			try {
 				sendEmail("FactivaExtractor Processing COMPLETE", "Processing completed at: " + new Date());
 			} catch (Exception e) {
@@ -196,7 +191,7 @@ public class FactivaExtractorThread implements Runnable {
 	}
 	
 	private boolean cleanupDownloadDirectory() {
-		File tempDownloadDir = new File(this.tempDownloadDirPath);
+		File tempDownloadDir = new File(config.getTempDownloadDirPath());
 		File[] filesInTempDownloadDir = tempDownloadDir.listFiles();
 		if(tempDownloadDir != null && filesInTempDownloadDir != null) {
 			for (File fileToDelete : filesInTempDownloadDir) {
@@ -213,7 +208,7 @@ public class FactivaExtractorThread implements Runnable {
 	}
 	
 	private void reportExceptionToUi(String message, int percentComplete, Exception e) {
-		if(this.alertEmailAddress != null) {
+		if(config.getAlertEmailAddress() != null) {
 			// if an error email was specified, send an error email!
 			StringBuilder buffer = new StringBuilder();
 			buffer.append("An error occurred during FactivaExtractor processing at ");
@@ -234,7 +229,7 @@ public class FactivaExtractorThread implements Runnable {
 	
 	private void sendEmail(String subject, String message) throws EmailException {
 		Email email = new Email();
-		email.setToAddress(this.alertEmailAddress);
+		email.setToAddress(config.getAlertEmailAddress());
 		email.setSubject(subject);
 		email.setMessage(message);
 		EmailSender.sendEmail(email);

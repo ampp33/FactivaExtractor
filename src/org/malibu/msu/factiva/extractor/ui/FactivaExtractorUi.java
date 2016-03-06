@@ -95,7 +95,7 @@ public class FactivaExtractorUi {
 	private void initialize() throws IOException {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
-		frmFactivaextractorV.setTitle("FactivaExtractor v2.5");
+		frmFactivaextractorV.setTitle("FactivaExtractor v3.1");
 		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
@@ -114,7 +114,7 @@ public class FactivaExtractorUi {
 		addStep1Directions(panel);
 		addUsernameLabelAndInput(panel);
 		addPasswordLabelAndInput(panel);
-		addSkipLoginCheckbox(panel);
+		addSkipLoginAndPublicationsCheckbox(panel);
 		addLogo(panel);
 
 		addStep2Directions(panel);
@@ -246,7 +246,7 @@ public class FactivaExtractorUi {
 		panel.add(btnRun);
 	}
 
-	private void addSkipLoginCheckbox(JPanel panel) {
+	private void addSkipLoginAndPublicationsCheckbox(JPanel panel) {
 		JCheckBox chckbxSkipLogin = new JCheckBox("Skip login");
 		chckbxSkipLogin.setBackground(Color.WHITE);
 		chckbxSkipLogin.setBounds(487, 117, 113, 25);
@@ -256,6 +256,17 @@ public class FactivaExtractorUi {
 			}
 		});
 		panel.add(chckbxSkipLogin);
+		
+		JCheckBox chckbxRemoveallPublications = new JCheckBox("Remove 'All Publications'");
+		chckbxRemoveallPublications.setSelected(true);
+		chckbxRemoveallPublications.setBackground(Color.WHITE);
+		chckbxRemoveallPublications.setBounds(488, 142, 150, 23);
+		chckbxRemoveallPublications.addChangeListener(new ChangeListener() {
+			public void stateChanged(ChangeEvent e) {
+				config.setRemoveAllPublicationsFilter(((AbstractButton)e.getSource()).isSelected());
+			}
+		});
+		panel.add(chckbxRemoveallPublications);
 	}
 
 	private void addSendTestEmailButton(JPanel panel) {

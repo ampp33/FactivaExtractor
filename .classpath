@@ -5,8 +5,8 @@
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER"/>
 	<classpathentry kind="lib" path="lib/EmailUtilities.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.13.jar"/>
-	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/selenium-2.48.2"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/poi-3.13"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/email"/>
+	<classpathentry kind="con" path="org.eclipse.jdt.USER_LIBRARY/selenium-2.52.0"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

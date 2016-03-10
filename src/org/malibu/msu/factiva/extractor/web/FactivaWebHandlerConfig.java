@@ -6,7 +6,7 @@ public class FactivaWebHandlerConfig {
 	private String username = null;
 	private String password = null;
 	private boolean skipLogin = false;
-	private boolean removeAllPublicationsFilter = true;
+	private boolean removeAllPublicationsFilter = false;
 	private String alertEmailAddress = null;
 	private String workingDirPath = null;
 	private String spreadsheetFilePath = null;

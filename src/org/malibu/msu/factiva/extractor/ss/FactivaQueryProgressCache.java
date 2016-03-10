@@ -64,6 +64,12 @@ public class FactivaQueryProgressCache {
 			close();
 		} catch (IOException e) {}
 		
+		// in a special case where the cache file doesn't exist
+		// (aka no work was done), don't try to write to it
+		if(!new File(this.cacheFilePath).exists()) {
+			return;
+		}
+		
 		String line = null;
 		BufferedReader reader = null;
 		try {

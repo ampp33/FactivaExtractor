@@ -95,7 +95,7 @@ public class FactivaExtractorUi {
 	private void initialize() throws IOException {
 		frmFactivaextractorV = new JFrame();
 		frmFactivaextractorV.setResizable(false);
-		frmFactivaextractorV.setTitle("FactivaExtractor v3.1");
+		frmFactivaextractorV.setTitle("FactivaExtractor v4.1");
 		frmFactivaextractorV.setBounds(100, 100, 650, 728);
 		frmFactivaextractorV.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
 		frmFactivaextractorV.getContentPane().setLayout(null);
@@ -258,7 +258,7 @@ public class FactivaExtractorUi {
 		panel.add(chckbxSkipLogin);
 		
 		JCheckBox chckbxRemoveallPublications = new JCheckBox("Remove 'All Publications'");
-		chckbxRemoveallPublications.setSelected(true);
+		chckbxRemoveallPublications.setSelected(false);
 		chckbxRemoveallPublications.setBackground(Color.WHITE);
 		chckbxRemoveallPublications.setBounds(488, 142, 150, 23);
 		chckbxRemoveallPublications.addChangeListener(new ChangeListener() {
